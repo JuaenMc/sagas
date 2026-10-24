@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with contact information and membership status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "vipLevel": { "type": "string", "maxLength": 50 },
+        "cashbackBalance": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "email"]
+    },
+    "Order": {
+      "title": "Customer Order",
+      "description": "Order placed by a customer in the store",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "maxLength": 50 },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string", "maxLength": 50 },
+        "itemsCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["orderId", "userId", "total", "status"]
+    },
+    "SavedCard": {
+      "title": "Saved Credit Card",
+      "description": "Tokenized payment card info (no CVV stored)",
+      "type": "object",
+      "properties": {
+        "cardId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "brand": { "type": "string", "maxLength": 50 },
+        "last4": { "type": "string", "maxLength": 4 },
+        "holder": { "type": "string", "maxLength": 100 },
+        "expiry": { "type": "string", "maxLength": 10 },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["cardId", "userId", "brand", "last4", "holder", "expiry"]
+    },
+    "Address": {
+      "title": "Delivery Address",
+      "description": "User saved physical delivery address",
+      "type": "object",
+      "properties": {
+        "addressId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "label": { "type": "string", "maxLength": 50 },
+        "recipientName": { "type": "string", "maxLength": 100 },
+        "cep": { "type": "string", "maxLength": 10 },
+        "street": { "type": "string", "maxLength": 200 },
+        "number": { "type": "string", "maxLength": 20 },
+        "complement": { "type": "string", "maxLength": 100 },
+        "neighborhood": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 2 },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["addressId", "userId", "cep", "street", "number", "neighborhood", "city", "state"]
+    },
+    "Product": {
+      "title": "Store Product",
+      "description": "Apparel item available in Sagas Brasil catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "subCategory": { "type": "string", "maxLength": 100 },
+        "price": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "images": { "type": "array" },
+        "inStock": { "type": "boolean" },
+        "badge": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "price"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document"
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders placed by the user"
+    },
+    "/users/{userId}/savedCards/{cardId}": {
+      "schema": "SavedCard",
+      "description": "Saved credit cards of the user"
+    },
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": "Address",
+      "description": "Saved delivery addresses of the user"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Public catalog products collection"
+    }
+  }
+}
