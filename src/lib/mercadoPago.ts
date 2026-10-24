@@ -1,6 +1,19 @@
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 
 /**
+ * Obtém a URL base do backend (sagasBackend), dando prioridade à variável VITE_BACKEND_URL
+ */
+export function getBackendApiUrl(): string {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return 'https://sagas.moda';
+}
+
+/**
  * Cria a instância do cliente Mercado Pago usando o Access Token fornecido
  */
 export function getMercadoPagoClient(accessToken: string): MercadoPagoConfig {
@@ -31,7 +44,26 @@ export interface CreatePreferenceParams {
 }
 
 /**
- * Cria uma Preference de pagamento para o Checkout Pro / Pix no Mercado Pago
+ * Chama o backend sagasBackend para criar Preference de pagamento
+ */
+export async function createPaymentPreferenceApi(params: Omit<CreatePreferenceParams, 'accessToken'> & { accessToken?: string }) {
+  const baseUrl = getBackendApiUrl();
+  const response = await fetch(`${baseUrl}/api/mercadopago/create-preference`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || 'Falha ao criar preference de pagamento');
+  }
+
+  return await response.json();
+}
+
+/**
+ * Cria uma Preference de pagamento via SDK Node Mercado Pago
  */
 export async function createPaymentPreference({
   accessToken,
@@ -45,7 +77,7 @@ export async function createPaymentPreference({
   const client = getMercadoPagoClient(accessToken);
   const preference = new Preference(client);
 
-  const baseUrl = redirectUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://sagasbrasilmoda.com.br');
+  const baseUrl = redirectUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://sagas.moda');
 
   const response = await preference.create({
     body: {
@@ -95,7 +127,26 @@ export interface CreatePixPaymentParams {
 }
 
 /**
- * Cria um pagamento Pix transparente gerando o QR Code e o Copia e Cola dinâmico oficial
+ * Chama o backend sagasBackend para gerar Pix Transparente
+ */
+export async function createMercadoPagoPixApi(params: Omit<CreatePixPaymentParams, 'accessToken'> & { accessToken?: string }) {
+  const baseUrl = getBackendApiUrl();
+  const response = await fetch(`${baseUrl}/api/mercadopago/create-pix`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || 'Falha ao gerar Pix no Mercado Pago');
+  }
+
+  return await response.json();
+}
+
+/**
+ * Cria um pagamento Pix transparente via SDK Node Mercado Pago
  */
 export async function createMercadoPagoPix({
   accessToken,
