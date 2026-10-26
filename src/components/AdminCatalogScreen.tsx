@@ -60,9 +60,9 @@ const COLOR_PRESETS: ProductColor[] = [
 export const AdminCatalogScreen: React.FC = () => {
   const { 
     products, 
-    addProduct, 
-    deleteProduct, 
-    seedCatalogToFirestore, 
+    isSyncedWithErp,
+    fetchProductsFromERP,
+    deleteProduct,
     closeSubScreen, 
     showToast,
     storeSettings,
@@ -70,8 +70,7 @@ export const AdminCatalogScreen: React.FC = () => {
   } = useCart();
 
   const [activeTab, setActiveTab] = useState<'catalog' | 'payments' | 'whatsapp' | 'apk'>('catalog');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
 
   // Settings local state
   const [localSettings, setLocalSettings] = useState<StoreSettings>({ ...storeSettings });
@@ -121,98 +120,16 @@ export const AdminCatalogScreen: React.FC = () => {
     }
   };
 
-  // Product Form State
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState<'infantil' | 'feminino' | 'combos' | 'novidades'>('infantil');
-  const [subCategory, setSubCategory] = useState('Vestidos');
-  const [price, setPrice] = useState('59.90');
-  const [originalPrice, setOriginalPrice] = useState('89.90');
-  const [badge, setBadge] = useState('Novidade');
-  const [imageUrl, setImageUrl] = useState(PHOTO_PRESETS[0].url);
-  const [isComboEligible, setIsComboEligible] = useState(true);
-  const [description, setDescription] = useState('Confeccionado em tecido 100% nobre e respirável, pensado para oferecer máximo conforto e durabilidade com acabamento primoroso.');
-  const [fabricInfo, setFabricInfo] = useState('Composição: 100% Algodão Premium Fio Penteado. Toque ultra macio.');
-  const [selectedSizes, setSelectedSizes] = useState<string[]>(['P', 'M', 'G', 'GG']);
-  const [selectedColors, setSelectedColors] = useState<ProductColor[]>([COLOR_PRESETS[0], COLOR_PRESETS[1]]);
-
-  const handleSelectPresetPhoto = (preset: typeof PHOTO_PRESETS[0]) => {
-    setImageUrl(preset.url);
-    if (!name) setName(preset.name);
-    setCategory(preset.category as any);
-    setSubCategory(preset.subCategory);
-    showToast(`Foto "${preset.name}" selecionada!`);
-  };
-
-  const toggleSize = (size: string) => {
-    if (selectedSizes.includes(size)) {
-      if (selectedSizes.length > 1) {
-        setSelectedSizes(selectedSizes.filter(s => s !== size));
-      }
-    } else {
-      setSelectedSizes([...selectedSizes, size]);
-    }
-  };
-
-  const toggleColor = (color: ProductColor) => {
-    if (selectedColors.some(c => c.name === color.name)) {
-      if (selectedColors.length > 1) {
-        setSelectedColors(selectedColors.filter(c => c.name !== color.name));
-      }
-    } else {
-      setSelectedColors([...selectedColors, color]);
-    }
-  };
-
-  const handleSeed = async () => {
-    setIsSeeding(true);
+  const handleReloadFromERP = async () => {
+    setIsReloading(true);
     try {
-      await seedCatalogToFirestore();
+      await fetchProductsFromERP();
+      showToast('Catálogo recarregado com sucesso do ERP!');
+    } catch (err) {
+      showToast('Erro ao recarregar catálogo do ERP');
     } finally {
-      setIsSeeding(false);
+      setIsReloading(false);
     }
-  };
-
-  const handleSubmitProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      showToast('Informe o nome da peça');
-      return;
-    }
-    const numPrice = parseFloat(price.replace(',', '.'));
-    const numOriginal = parseFloat(originalPrice.replace(',', '.')) || numPrice;
-
-    if (isNaN(numPrice) || numPrice <= 0) {
-      showToast('Informe um preço válido');
-      return;
-    }
-
-    const discount = numOriginal > numPrice ? Math.round(((numOriginal - numPrice) / numOriginal) * 100) : 0;
-    const newId = `prod-custom-${Date.now()}`;
-
-    const newProduct: Product = {
-      id: newId,
-      name: name.trim(),
-      category,
-      subCategory,
-      price: numPrice,
-      originalPrice: numOriginal,
-      discountPercent: discount,
-      rating: 5.0,
-      reviewsCount: 1,
-      badge: badge.trim() || undefined,
-      secondaryBadge: discount > 0 ? `-${discount}%` : undefined,
-      images: [imageUrl.trim(), imageUrl.trim()],
-      colors: selectedColors,
-      sizes: selectedSizes,
-      inStock: true,
-      isComboEligible,
-      description: description.trim(),
-      fabricInfo: fabricInfo.trim()
-    };
-
-    await addProduct(newProduct);
-    setIsFormOpen(false);
-    setName('');
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -253,16 +170,6 @@ export const AdminCatalogScreen: React.FC = () => {
             </div>
           </div>
 
-          {activeTab === 'catalog' && !isFormOpen && (
-            <button
-              type="button"
-              onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF6B57] hover:bg-[#E05340] text-white text-xs font-bold shadow-xs active:scale-95 transition"
-            >
-              <Plus size={15} />
-              <span>Nova Peça</span>
-            </button>
-          )}
         </div>
 
         {/* Tab Navigation */}
@@ -318,16 +225,16 @@ export const AdminCatalogScreen: React.FC = () => {
         {/* ================= TAB 1: CATALOG ================= */}
         {activeTab === 'catalog' && (
           <>
-            {/* Quick Stats & Firestore Sync Banner */}
+            {/* Quick Stats & ERP Sync Banner */}
             <section className="bg-gradient-to-br from-[#171B2B] to-[#2D334A] rounded-3xl p-4 text-white shadow-md space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                    Firestore Conectado
+                  <span className={`w-2.5 h-2.5 rounded-full ${isSyncedWithErp ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                  <span className={`text-xs font-bold uppercase tracking-wider ${isSyncedWithErp ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {isSyncedWithErp ? 'ERP Sincronizado (localhost:3001)' : 'Modo Offline (Catálogo Local)'}
                   </span>
                 </div>
-                <span className="text-[11px] text-gray-300">Coleção /products</span>
+                <span className="text-[11px] text-gray-300">Catálogo Centralizado</span>
               </div>
 
               <div className="grid grid-cols-3 gap-2 pt-1 text-center">
@@ -348,174 +255,15 @@ export const AdminCatalogScreen: React.FC = () => {
               <div className="pt-1 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={handleSeed}
-                  disabled={isSeeding}
-                  className="w-full py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"
+                  onClick={handleReloadFromERP}
+                  disabled={isReloading}
+                  className="w-full py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50 active:scale-98"
                 >
-                  <RefreshCw size={14} className={isSeeding ? 'animate-spin' : ''} />
-                  <span>{isSeeding ? 'Sincronizando...' : 'Sincronizar Coleção Completa no Firestore'}</span>
+                  <RefreshCw size={14} className={isReloading ? 'animate-spin' : ''} />
+                  <span>{isReloading ? 'Recarregando do ERP...' : 'Recarregar do ERP'}</span>
                 </button>
               </div>
             </section>
-
-            {/* Cadastro Form */}
-            {isFormOpen && (
-              <div className="bg-white rounded-3xl border border-[#F0ECE6] shadow-sm p-4 space-y-4 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#FFF0ED] text-[#FF6B57] flex items-center justify-center">
-                      <Shirt size={16} />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-black text-[#171B2B]">Cadastrar Nova Peça</h2>
-                      <p className="text-[10px] text-gray-400">Salva direto na coleção products do Firestore</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsFormOpen(false)}
-                    className="text-gray-400 hover:text-gray-600 text-xs font-bold"
-                  >
-                    Fechar
-                  </button>
-                </div>
-
-                <form onSubmit={handleSubmitProduct} className="space-y-4 text-xs">
-                  {/* Preset Quick Select */}
-                  <div>
-                    <label className="font-bold text-gray-700 block mb-1">
-                      📸 Seleção Rápida de Foto de Alta Qualidade:
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {PHOTO_PRESETS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => handleSelectPresetPhoto(preset)}
-                          className={`p-1.5 rounded-xl border text-left flex flex-col items-center gap-1 transition ${
-                            imageUrl === preset.url
-                              ? 'border-[#FF6B57] bg-orange-50/50 ring-2 ring-[#FF6B57]/20'
-                              : 'border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          <img
-                            src={preset.url}
-                            alt={preset.name}
-                            className="w-full h-16 object-cover rounded-lg"
-                          />
-                          <span className="text-[10px] font-semibold text-gray-700 line-clamp-1 text-center">
-                            {preset.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Nome da Peça */}
-                  <div>
-                    <label className="font-bold text-gray-700 block mb-1">Nome do Produto</label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Ex: Vestido Midi Poá Romântico"
-                      required
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B57]/30 text-xs"
-                    />
-                  </div>
-
-                  {/* Categoria e Subcategoria */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-bold text-gray-700 block mb-1">Categoria</label>
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value as any)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF6B57]/30 text-xs"
-                      >
-                        <option value="infantil">Infantil</option>
-                        <option value="feminino">Feminino</option>
-                        <option value="combos">Combos Especiais</option>
-                        <option value="novidades">Novidades</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="font-bold text-gray-700 block mb-1">Subcategoria</label>
-                      <input
-                        type="text"
-                        value={subCategory}
-                        onChange={(e) => setSubCategory(e.target.value)}
-                        placeholder="Ex: Vestidos, Macaquinhos"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B57]/30 text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Preços */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-bold text-gray-700 block mb-1">Preço Atual (R$)</label>
-                      <input
-                        type="text"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        placeholder="59.90"
-                        required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B57]/30 text-xs font-bold text-[#FF6B57]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-bold text-gray-700 block mb-1">Preço Original "De" (R$)</label>
-                      <input
-                        type="text"
-                        value={originalPrice}
-                        onChange={(e) => setOriginalPrice(e.target.value)}
-                        placeholder="89.90"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B57]/30 text-xs text-gray-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Badge & Combo Flag */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-bold text-gray-700 block mb-1">Badge Promocional</label>
-                      <input
-                        type="text"
-                        value={badge}
-                        onChange={(e) => setBadge(e.target.value)}
-                        placeholder="Ex: 3 por R$ 100, 40% OFF"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B57]/30 text-xs"
-                      />
-                    </div>
-
-                    <div className="flex items-center pt-5">
-                      <label className="flex items-center gap-2 cursor-pointer font-semibold text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={isComboEligible}
-                          onChange={(e) => setIsComboEligible(e.target.checked)}
-                          className="w-4 h-4 text-[#FF6B57] rounded"
-                        />
-                        <span>Elegível ao Combo 3 por R$ 100</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      className="w-full py-3 rounded-full bg-[#FF6B57] hover:bg-[#E05340] text-white font-black text-xs shadow-md active:scale-95 transition"
-                    >
-                      Salvar Peça no Firestore
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
 
             {/* Listagem de Peças Cadastradas */}
             <section className="space-y-2.5">

@@ -1,3 +1,5 @@
+export * from './erp';
+
 export interface ProductColor {
   name: string;
   hex: string;
@@ -6,7 +8,7 @@ export interface ProductColor {
 export interface Product {
   id: string;
   name: string;
-  category: 'infantil' | 'feminino' | 'combos' | 'novidades';
+  category: 'infantil' | 'feminino' | 'combos' | 'novidades' | string;
   subCategory?: string;
   ageGroup?: string;
   price: number;
@@ -26,6 +28,10 @@ export interface Product {
   description: string;
   fabricInfo: string;
   measurementsInfo?: string;
+  masterSku?: string;
+  costPrice?: number;
+  stock?: number;
+  variations?: import('./erp').ProductVariation[];
 }
 
 export interface CartItem {

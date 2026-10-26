@@ -8,13 +8,14 @@
     "start": "node server.ts",
     "build": "vite build",
     "android:init": "cap add android",
-    "build:apk": "vite build && cap sync android",
+    "build:apk": "vite build && cap sync android && cd android && gradlew.bat assembleDebug && cd .. && node -e \"const fs=require('fs'); fs.mkdirSync('dist/android/app/build/outputs/apk', {recursive:true}); fs.copyFileSync('android/app/build/outputs/apk/debug/app-debug.apk', 'dist/android/app/build/outputs/apk/app-debug.apk');\"",
     "open:android": "cap open android",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",

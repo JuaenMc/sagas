@@ -4,6 +4,7 @@ import { INITIAL_CART_ITEMS, PRODUCTS } from '../data/products';
 import { auth, googleProvider, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+import { erpClient } from '../services/erpClient';
 
 interface CartContextType {
   cart: CartItem[];
@@ -66,6 +67,12 @@ interface CartContextType {
   isCheckoutOpen: boolean;
   setIsCheckoutOpen: (open: boolean) => void;
 
+  // ERP Checkout & Order Lifecycle (Fase 4)
+  currentOrderId: string | null;
+  currentOrderNumber: string | null;
+  createCheckoutOrder: (paymentMethod?: 'PIX' | 'CREDIT_CARD' | 'BOLETO') => Promise<any>;
+  confirmOrderPayment: (paymentData?: { externalPaymentId?: string; paidAt?: string }) => Promise<boolean>;
+
   // Authentication & User Data
   currentUser: UserProfile | null;
   firebaseAuthUser: User | null;
@@ -86,8 +93,10 @@ interface CartContextType {
   deleteAddress: (id: string) => Promise<void>;
   setDefaultAddress: (id: string) => Promise<void>;
 
-  // Dynamic Products Catalog (Firestore)
+  // Dynamic Products Catalog (ERP Sincronizado + Fallback Local)
   products: Product[];
+  isSyncedWithErp: boolean;
+  fetchProductsFromERP: () => Promise<void>;
   addProduct: (product: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   seedCatalogToFirestore: () => Promise<void>;
@@ -185,6 +194,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isTechGuideOpen, setIsTechGuideOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [currentOrderNumber, setCurrentOrderNumber] = useState<string | null>(null);
+  const [currentExternalId, setCurrentExternalId] = useState<string | null>(null);
 
   // Authentication State
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null);
@@ -196,8 +208,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [addresses, setAddresses] = useState<DeliveryAddress[]>(DEFAULT_ADDRESSES);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>('addr-default-1');
 
-  // Dynamic Products Catalog (Firestore)
+  // Dynamic Products Catalog (ERP Sincronizado + Fallback Local)
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [isSyncedWithErp, setIsSyncedWithErp] = useState<boolean>(false);
 
   // Store & Merchant Gateway Settings
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(() => {
@@ -345,33 +358,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [firebaseAuthUser]);
 
-  // Listen for Dynamic Catalog Products in Firestore
-  useEffect(() => {
-    const productsPath = 'products';
-    const unsubscribe = onSnapshot(
-      collection(db, 'products'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteProducts: Product[] = snapshot.docs.map(d => ({
-            id: d.id,
-            ...(d.data() as any)
-          }));
-          // Merge remote products with preset PRODUCTS, prioritizing remote
-          const merged = [...remoteProducts];
-          for (const staticProd of PRODUCTS) {
-            if (!merged.some(m => m.id === staticProd.id)) {
-              merged.push(staticProd);
-            }
-          }
-          setProducts(merged);
-        }
-      },
-      (error) => {
-        // If collection not created yet, default static PRODUCTS remain active
-        console.info('Firestore products sync:', error.message);
+  // Sincronização do catálogo com o ERP Backend (com fallback offline)
+  const fetchProductsFromERP = async () => {
+    try {
+      const erpProducts = await erpClient.getProducts();
+      if (erpProducts && erpProducts.length > 0) {
+        setProducts(erpProducts);
+        setIsSyncedWithErp(true);
+        console.info(`[CartContext] Catálogo sincronizado com o ERP (${erpProducts.length} produtos carregados).`);
+      } else {
+        console.warn('[CartContext] ERP retornou lista vazia ou falhou. Mantendo catálogo estático como fallback.');
+        setProducts(PRODUCTS);
+        setIsSyncedWithErp(false);
+        showToast('Modo offline: catálogo local');
       }
-    );
-    return () => unsubscribe();
+    } catch (err: any) {
+      console.warn('[CartContext] Falha ao consultar ERP, usando fallback local:', err?.message);
+      setProducts(PRODUCTS);
+      setIsSyncedWithErp(false);
+      showToast('Modo offline: catálogo local');
+    }
+  };
+
+  useEffect(() => {
+    fetchProductsFromERP();
   }, []);
 
   const loginWithGoogle = async () => {
@@ -616,6 +626,92 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('Carrinho limpo');
   };
 
+  /**
+   * B2. Inicia o checkout no ERP criando o pedido e reservando estoque (status: PENDING_PAYMENT)
+   */
+  const createCheckoutOrder = async (method: 'PIX' | 'CREDIT_CARD' | 'BOLETO' = 'PIX') => {
+    if (cart.length === 0) {
+      showToast('Carrinho vazio!');
+      return null;
+    }
+
+    try {
+      const extId = currentExternalId || `order-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (!currentExternalId) {
+        setCurrentExternalId(extId);
+      }
+
+      const orderItems = cart.map(item => {
+        const prod = products.find(p => p.id === item.productId);
+        let varId = item.productId;
+        if (prod && prod.variations && prod.variations.length > 0) {
+          const matched = prod.variations.find(v => 
+            v.size?.toLowerCase() === item.selectedSize?.toLowerCase() &&
+            v.color?.toLowerCase() === item.selectedColor?.toLowerCase()
+          ) || prod.variations.find(v => v.size?.toLowerCase() === item.selectedSize?.toLowerCase()) || prod.variations[0];
+          varId = matched.id;
+        }
+
+        return {
+          variationId: varId,
+          quantity: item.quantity,
+          unitPrice: item.price
+        };
+      });
+
+      const customerPayload = {
+        firebaseUid: firebaseAuthUser?.uid || currentUser?.uid || 'guest-mariana',
+        name: currentUser?.displayName || firebaseAuthUser?.displayName || 'Mariana Silva',
+        email: currentUser?.email || firebaseAuthUser?.email || 'mariana@sagas.moda',
+        phone: '11998765432',
+        address: selectedAddress
+      };
+
+      const result = await erpClient.createOrder({
+        externalId: extId,
+        channel: 'APP_SAGAS',
+        customer: customerPayload,
+        items: orderItems,
+        shipping: { cost: 0, method: 'CORREIOS_PAC' },
+        paymentMethod: method,
+        couponCode: appliedCoupon || undefined
+      });
+
+      if (result && result.orderId) {
+        setCurrentOrderId(result.orderId);
+        setCurrentOrderNumber(result.orderNumber);
+        return result;
+      }
+      throw new Error(result?.message || 'Erro ao criar pedido no ERP');
+    } catch (err: any) {
+      console.error('[CartContext.createCheckoutOrder] Erro:', err);
+      showToast(err.message || 'Erro ao criar pedido no ERP');
+      throw err;
+    }
+  };
+
+  /**
+   * B2. Confirma o pagamento no ERP (status: PAID) e realiza a baixa definitiva de estoque
+   */
+  const confirmOrderPayment = async (paymentData: { externalPaymentId?: string; paidAt?: string } = {}) => {
+    if (!currentOrderId) {
+      console.warn('[CartContext.confirmOrderPayment] Nenhum pedido ativo para confirmar no momento.');
+      return false;
+    }
+
+    try {
+      await erpClient.confirmPayment(currentOrderId, paymentData);
+      showToast(`Pedido ${currentOrderNumber || ''} aprovado com sucesso!`);
+      clearCart();
+      setCurrentExternalId(null);
+      return true;
+    } catch (err: any) {
+      console.error('[CartContext.confirmOrderPayment] Erro:', err);
+      showToast('Falha ao confirmar pagamento no ERP');
+      return false;
+    }
+  };
+
   const toggleFavorite = (productId: string) => {
     setFavorites(prev => {
       const exists = prev.includes(productId);
@@ -760,7 +856,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         saveAddress,
         deleteAddress,
         setDefaultAddress,
+        currentOrderId,
+        currentOrderNumber,
+        createCheckoutOrder,
+        confirmOrderPayment,
         products,
+        isSyncedWithErp,
+        fetchProductsFromERP,
         addProduct,
         deleteProduct,
         seedCatalogToFirestore,

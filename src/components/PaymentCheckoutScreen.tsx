@@ -32,7 +32,11 @@ export const PaymentCheckoutScreen: React.FC<PaymentCheckoutScreenProps> = ({ on
     selectedAddress,
     selectedAddressId,
     setSelectedAddressId,
-    storeSettings
+    storeSettings,
+    createCheckoutOrder,
+    confirmOrderPayment,
+    currentOrderId,
+    currentOrderNumber
   } = useCart();
 
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
@@ -83,57 +87,77 @@ export const PaymentCheckoutScreen: React.FC<PaymentCheckoutScreenProps> = ({ on
     setTimeout(() => setCopiedPix(false), 3500);
   };
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const handleFinishPayment = async () => {
-    setIsOrderFinished(true);
-    const newOrderId = `order-${Date.now()}`;
-    const orderNum = `#SG-${Math.floor(10000 + Math.random() * 90000)}`;
-    const userId = firebaseAuthUser?.uid || currentUser?.uid || 'guest-mariana';
-
-    const orderData: Order = {
-      id: newOrderId,
-      orderNumber: orderNum,
-      userId,
-      status: 'aprovado',
-      statusLabel: 'Pagamento Aprovado',
-      total: activeTotal,
-      paymentMethod: selectedPayment,
-      paymentMethodLabel: selectedPayment === 'pix' ? 'Pix Instantâneo' : selectedPayment === 'credit_card' ? 'Cartão de Crédito' : 'Boleto',
-      items: cart.map(item => ({
-        id: item.id,
-        name: item.name,
-        image: item.image,
-        price: item.price,
-        quantity: item.quantity,
-        size: item.selectedSize,
-        color: item.selectedColor
-      })),
-      createdAt: 'Agora mesmo',
-      trackingCode: `BR${Math.floor(100000000 + Math.random() * 900000000)}SP`,
-      estimatedDelivery: 'Em até 2 dias úteis',
-      deliveryAddress: selectedAddress 
-        ? `${selectedAddress.street}, ${selectedAddress.number}${selectedAddress.complement ? ` (${selectedAddress.complement})` : ''} - ${selectedAddress.neighborhood}, ${selectedAddress.city}/${selectedAddress.state} (CEP: ${selectedAddress.cep})`
-        : 'Av. Paulista, 1578 - Bela Vista, São Paulo - SP'
-    };
-
-    setCompletedOrderData(orderData);
+    if (isProcessing) return;
+    setIsProcessing(true);
 
     try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db } = await import('../lib/firebase');
-      const orderRef = doc(db, 'users', userId, 'orders', newOrderId);
-      await setDoc(orderRef, {
-        ...orderData,
-        orderId: newOrderId,
-        itemsCount: cart.length
-      });
-    } catch (err) {
-      console.warn('Firestore order write notice:', err);
-    }
+      // 1. Criar pedido no ERP com reserva de estoque caso ainda não exista
+      let orderId = currentOrderId;
+      let orderNumber = currentOrderNumber;
 
-    setTimeout(() => {
-      clearCart();
-      showToast(`Pedido ${orderNum} salvo no Firestore!`);
-    }, 1200);
+      const pMethod = selectedPayment === 'pix' ? 'PIX' : selectedPayment === 'credit_card' ? 'CREDIT_CARD' : 'BOLETO';
+      
+      if (!orderId) {
+        showToast('Reservando estoque no ERP...');
+        const createRes = await createCheckoutOrder(pMethod);
+        if (createRes && createRes.orderId) {
+          orderId = createRes.orderId;
+          orderNumber = createRes.orderNumber;
+        } else {
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      // 2. Confirmar pagamento no ERP (baixa definitiva de estoque e status: PAID)
+      showToast('Confirmando pagamento no ERP...');
+      const externalPaymentId = `pay-${Date.now()}`;
+      await confirmOrderPayment({
+        externalPaymentId,
+        paidAt: new Date().toISOString()
+      });
+
+      const finalOrderNumber = orderNumber || `#SG-${Math.floor(10000 + Math.random() * 90000)}`;
+      const userId = firebaseAuthUser?.uid || currentUser?.uid || 'guest-mariana';
+
+      const orderData: Order = {
+        id: orderId || `order-${Date.now()}`,
+        orderNumber: finalOrderNumber,
+        userId,
+        status: 'aprovado',
+        statusLabel: 'Pagamento Aprovado',
+        total: activeTotal,
+        paymentMethod: selectedPayment,
+        paymentMethodLabel: selectedPayment === 'pix' ? 'Pix Instantâneo' : selectedPayment === 'credit_card' ? 'Cartão de Crédito' : 'Boleto',
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          price: item.price,
+          quantity: item.quantity,
+          size: item.selectedSize,
+          color: item.selectedColor
+        })),
+        createdAt: 'Agora mesmo',
+        trackingCode: `BR${Math.floor(100000000 + Math.random() * 900000000)}SP`,
+        estimatedDelivery: 'Em até 2 dias úteis',
+        deliveryAddress: selectedAddress 
+          ? `${selectedAddress.street}, ${selectedAddress.number}${selectedAddress.complement ? ` (${selectedAddress.complement})` : ''} - ${selectedAddress.neighborhood}, ${selectedAddress.city}/${selectedAddress.state} (CEP: ${selectedAddress.cep})`
+          : 'Av. Paulista, 1578 - Bela Vista, São Paulo - SP'
+      };
+
+      setCompletedOrderData(orderData);
+      setIsOrderFinished(true);
+      showToast(`Pedido ${finalOrderNumber} confirmado no ERP!`);
+    } catch (err: any) {
+      console.error('Erro no fluxo de pagamento:', err);
+      showToast(err.message || 'Erro ao processar pagamento no ERP');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const activeTotal = selectedPayment === 'pix' ? pixTotal : total;

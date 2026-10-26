@@ -3,14 +3,69 @@ import { createServer as createViteServer } from 'vite';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const ERP_BACKEND_URL = process.env.VITE_BACKEND_URL || process.env.ERP_BACKEND_URL || 'http://localhost:3001';
+const ERP_API_KEY = process.env.VITE_ERP_API_KEY || process.env.ERP_API_KEY || 'sagas_erp_sec_9f8a3c2b1e4d7f6a5b8c9d0e1f2a3b4c';
 
 app.use(express.json());
+
+/**
+ * Envia confirmação de pagamento para o ERP com retry exponencial (3 tentativas)
+ */
+async function confirmErpPaymentWithRetry(orderId: string, payload: { externalPaymentId: string; paidAt: string }, maxRetries = 3) {
+  let attempt = 0;
+  let delayMs = 1000;
+
+  while (attempt < maxRetries) {
+    attempt++;
+    try {
+      console.log(`[ERP Webhook Relay] [Tentativa ${attempt}/${maxRetries}] Confirmando pagamento do pedido ${orderId} no ERP (${ERP_BACKEND_URL})...`);
+      const response = await fetch(`${ERP_BACKEND_URL}/api/orders/${encodeURIComponent(orderId)}/payment-confirmed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-ERP-API-KEY': ERP_API_KEY,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (response.ok) {
+        console.log(`[ERP Webhook Relay] SUCESSO: Pedido ${orderId} confirmado no ERP.`, {
+          orderNumber: responseData?.orderNumber,
+          status: responseData?.status,
+          idempotent: responseData?.idempotent,
+        });
+        return { success: true, data: responseData };
+      } else {
+        console.error(`[ERP Webhook Relay] HTTP ${response.status} ao confirmar pedido ${orderId}:`, responseData);
+        if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+          return { success: false, error: responseData };
+        }
+      }
+    } catch (networkErr: any) {
+      console.error(`[ERP Webhook Relay] Erro de rede na tentativa ${attempt}:`, networkErr.message);
+    }
+
+    if (attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, delayMs));
+      delayMs *= 2;
+    }
+  }
+
+  console.error(`[ERP Webhook Relay ALERTA] Falha crítica: não foi possível confirmar pagamento para o pedido ${orderId} no ERP após ${maxRetries} tentativas.`);
+  return { success: false, error: 'Max retries exceeded' };
+}
 
 /**
  * 1. Endpoint para Criar Preference de Pagamento (Checkout Pro / Pix / Cartão)
@@ -137,7 +192,7 @@ app.post('/api/mercadopago/create-pix', async (req: Request, res: Response) => {
 });
 
 /**
- * 3. Endpoint de Webhook (IPN) do Mercado Pago para Baixa Automática
+ * 3. Endpoint de Webhook (IPN) do Mercado Pago para Baixa Automática e Sincronização com ERP
  */
 app.post('/api/mercadopago/webhook', async (req: Request, res: Response) => {
   try {
@@ -148,7 +203,24 @@ app.post('/api/mercadopago/webhook', async (req: Request, res: Response) => {
     const paymentId = body?.data?.id || query['data.id'] || query.id;
     const topic = query.topic || body?.type || query.type;
 
-    console.log(`[Mercado Pago Webhook] Recebida notificação: topic=${topic}, paymentId=${paymentId}`);
+    console.log(`[Mercado Pago Webhook] Recebida notificação: topic=${topic}, paymentId=${paymentId}`, {
+      query,
+      bodyType: body?.type,
+      action: body?.action,
+    });
+
+    // Suporte para simulação/mock de webhook em testes de integração
+    if (body?.mockApproved && (body?.orderId || body?.external_reference)) {
+      const orderRef = body.orderId || body.external_reference;
+      console.log(`[Mercado Pago Webhook] [MOCK APROVADO] Encaminhando confirmação de pagamento para ERP: ${orderRef}`);
+      confirmErpPaymentWithRetry(orderRef, {
+        externalPaymentId: String(body.paymentId || `mock-mp-${Date.now()}`),
+        paidAt: new Date().toISOString(),
+      }).catch(err => {
+        console.error('[Mercado Pago Webhook Mock] Erro ao sincronizar com ERP:', err);
+      });
+      return res.status(200).json({ success: true, message: 'Mock payment processed and forwarded to ERP' });
+    }
 
     if (paymentId && (topic === 'payment' || body?.action?.startsWith('payment.'))) {
       const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
@@ -160,10 +232,25 @@ app.post('/api/mercadopago/webhook', async (req: Request, res: Response) => {
         const payment = new Payment(client);
         const paymentData = await payment.get({ id: String(paymentId) });
 
-        console.log(`[Mercado Pago Webhook] Status do pagamento ${paymentId}: ${paymentData.status} (Pedido: ${paymentData.external_reference})`);
+        console.log(`[Mercado Pago Webhook] Status do pagamento ${paymentId}: ${paymentData.status} (Pedido / external_reference: ${paymentData.external_reference})`);
 
-        // Aqui você pode atualizar o Firestore:
-        // status === 'approved' -> atualiza pedido para 'aprovado'
+        if (paymentData.status === 'approved') {
+          const orderRef = paymentData.external_reference;
+          if (orderRef) {
+            console.log(`[Mercado Pago Webhook] Pagamento APROVADO! Despachando confirmação para o ERP para pedido: ${orderRef}`);
+            // Executar em segundo plano com retry exponencial para responder ao MP prontamente
+            confirmErpPaymentWithRetry(orderRef, {
+              externalPaymentId: String(paymentId),
+              paidAt: paymentData.date_approved || new Date().toISOString(),
+            }).catch(syncErr => {
+              console.error(`[Mercado Pago Webhook] Erro crítico ao chamar ERP para pedido ${orderRef}:`, syncErr);
+            });
+          } else {
+            console.warn(`[Mercado Pago Webhook] Pagamento ${paymentId} aprovado, mas sem external_reference associado.`);
+          }
+        }
+      } else {
+        console.warn('[Mercado Pago Webhook] MERCADOPAGO_ACCESS_TOKEN não configurado no servidor.');
       }
     }
 

@@ -3,6 +3,7 @@ import { useCart } from '../context/CartContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, setDoc, doc } from 'firebase/firestore';
 import { Order, OrderStatus } from '../types';
+import { erpClient } from '../services/erpClient';
 import { 
   ArrowLeft, ShoppingBag, Truck, PackageCheck, CheckCircle2, 
   Clock, ChevronRight, Search, RotateCcw, FileText, ExternalLink,
@@ -111,70 +112,87 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onBack }) => {
 
   const userId = firebaseAuthUser?.uid || currentUser?.uid || 'guest-mariana';
 
-  // Fetch orders in real time from Firestore
-  useEffect(() => {
+  const loadOrders = async () => {
     setLoading(true);
-    const ordersColPath = `users/${userId}/orders`;
-
     try {
-      const q = query(collection(db, 'users', userId, 'orders'));
-      const unsubscribe = onSnapshot(
-        q,
-        async (snapshot) => {
-          if (!snapshot.empty) {
-            const fetchedOrders: Order[] = [];
-            snapshot.forEach((docSnap) => {
-              const data = docSnap.data();
-              fetchedOrders.push({
-                id: docSnap.id,
-                orderNumber: data.orderNumber || `#SG-${docSnap.id.slice(0, 5).toUpperCase()}`,
-                userId: data.userId || userId,
-                createdAt: data.createdAt || 'Recentemente',
-                status: data.status || 'aprovado',
-                statusLabel: data.statusLabel || 'Aprovado',
-                total: data.total || 0,
-                paymentMethod: data.paymentMethod || 'pix',
-                paymentMethodLabel: data.paymentMethodLabel || 'Pix Instantâneo',
-                items: data.items || [],
-                trackingCode: data.trackingCode,
-                estimatedDelivery: data.estimatedDelivery,
-                deliveryAddress: data.deliveryAddress
-              });
-            });
-            setOrders(fetchedOrders);
-            setLoading(false);
-          } else {
-            // Seed starter demo orders to Firestore for seamless UX if user is authenticated
-            if (firebaseAuthUser) {
-              try {
-                for (const demoOrder of INITIAL_DEMO_ORDERS) {
-                  await setDoc(doc(db, 'users', userId, 'orders', demoOrder.id), {
-                    ...demoOrder,
-                    userId
-                  });
-                }
-              } catch (err) {
-                console.warn('Could not auto-seed starter orders:', err);
-              }
-            }
-            setOrders(INITIAL_DEMO_ORDERS);
-            setLoading(false);
+      const erpOrders = await erpClient.getOrders({ firebaseUid: userId });
+      if (erpOrders && erpOrders.length > 0) {
+        const mapped: Order[] = erpOrders.map((o: any) => {
+          let statusLabel = 'Pagamento Pendente';
+          let mappedStatus: any = 'em_preparacao';
+          if (o.status === 'PAID') {
+            statusLabel = 'Pagamento Aprovado';
+            mappedStatus = 'aprovado';
+          } else if (o.status === 'SHIPPED') {
+            statusLabel = 'Em Trânsito';
+            mappedStatus = 'em_transito';
+          } else if (o.status === 'DELIVERED') {
+            statusLabel = 'Entregue com Sucesso';
+            mappedStatus = 'entregue';
+          } else if (o.status === 'CANCELLED') {
+            statusLabel = 'Cancelado';
+            mappedStatus = 'cancelado';
+          } else if (o.status === 'PENDING_PAYMENT') {
+            statusLabel = 'Aguardando Pagamento';
+            mappedStatus = 'em_preparacao';
           }
-        },
-        (error) => {
-          console.warn('Firestore orders snapshot notice, using local orders cache:', error);
-          setOrders(INITIAL_DEMO_ORDERS);
-          setLoading(false);
-        }
-      );
 
-      return () => unsubscribe();
-    } catch (error) {
-      console.warn('Firestore orders fetch error:', error);
+          return {
+            id: o.id,
+            orderNumber: o.orderNumber?.startsWith('#') ? o.orderNumber : `#${o.orderNumber || ''}`,
+            userId,
+            createdAt: new Date(o.createdAt).toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            status: mappedStatus,
+            statusLabel,
+            total: Number(o.total || 0),
+            paymentMethod: 'pix',
+            paymentMethodLabel: 'ERP Integrado',
+            trackingCode: `BR${(o.orderNumber || '').replace(/\D/g, '') || '948201849'}SP`,
+            estimatedDelivery: 'Em até 2 dias úteis',
+            deliveryAddress: 'Endereço cadastrado na loja SAGAS',
+            items: (o.items || []).map((it: any) => ({
+              id: it.id,
+              name: it.name,
+              image: it.image || 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80',
+              price: Number(it.unitPrice || 0),
+              quantity: it.quantity,
+              size: it.size,
+              color: it.color
+            }))
+          };
+        });
+
+        setOrders(mapped);
+        setLoading(false);
+        return;
+      }
+
+      // Fallback: se o ERP retornar vazio ou falhar, buscar histórico prévio no Firestore
+      console.info('[OrdersScreen] Buscando pedidos no Firestore como fallback...');
+      const { getDocs } = await import('firebase/firestore');
+      const snapshot = await getDocs(collection(db, 'users', userId, 'orders'));
+      if (!snapshot.empty) {
+        const legacy: Order[] = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        setOrders(legacy);
+      } else {
+        setOrders(INITIAL_DEMO_ORDERS);
+      }
+    } catch (err) {
+      console.warn('[OrdersScreen] Falha ao carregar pedidos do ERP, usando fallback:', err);
       setOrders(INITIAL_DEMO_ORDERS);
+    } finally {
       setLoading(false);
     }
-  }, [userId, firebaseAuthUser]);
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, [userId]);
 
   // Filter orders by tab and search
   const filteredOrders = orders.filter((order) => {
@@ -190,34 +208,46 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onBack }) => {
     return true;
   });
 
-  const getStatusBadge = (status: OrderStatus) => {
+  const getStatusBadge = (status: OrderStatus | string) => {
     switch (status) {
-      case 'em_transito':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EBF7F0] border border-[#A8D5BA]/60 text-[#2E6945] text-[11px] font-extrabold">
-            <span className="w-2 h-2 rounded-full bg-[#2E6945] animate-pulse"></span>
-            A Caminho
-          </span>
-        );
+      case 'PENDING_PAYMENT':
       case 'em_preparacao':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FFF8E6] border border-[#FDE68A] text-[#B45309] text-[11px] font-extrabold">
-            <Clock size={12} className="text-[#B45309]" />
-            Em Separação
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-extrabold">
+            <Clock size={12} className="text-amber-600" />
+            Aguardando Pagamento
           </span>
         );
+      case 'PAID':
       case 'aprovado':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-extrabold">
-            <CheckCircle2 size={12} className="text-blue-600" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold">
+            <CheckCircle2 size={12} className="text-emerald-600" />
             Pagamento Aprovado
           </span>
         );
+      case 'SHIPPED':
+      case 'em_transito':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-extrabold">
+            <Truck size={12} className="text-blue-600" />
+            Em Trânsito
+          </span>
+        );
+      case 'DELIVERED':
       case 'entregue':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-700 text-[11px] font-extrabold">
             <CheckCircle2 size={12} className="text-emerald-600" />
             Entregue
+          </span>
+        );
+      case 'CANCELLED':
+      case 'cancelado':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-[11px] font-extrabold">
+            <AlertCircle size={12} className="text-red-600" />
+            Cancelado
           </span>
         );
       default:
