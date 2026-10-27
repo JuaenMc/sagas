@@ -14,10 +14,11 @@ export const HomeScreen: React.FC = () => {
     cart, 
     currentUser,
     products,
-    openSubScreen
+    openSubScreen,
+    searchQuery,
+    setSearchQuery
   } = useCart();
   const [activeCategoryChip, setActiveCategoryChip] = useState<'novidades' | 'feminino' | 'infantil' | 'promocoes' | 'combos' | 'acessorios'>('feminino');
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Fallback to static PRODUCTS if products is somehow empty
   const allProducts = products && products.length > 0 ? products : PRODUCTS;
@@ -54,84 +55,7 @@ export const HomeScreen: React.FC = () => {
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <div className="flex flex-col w-full pb-28 text-[#171b2b]">
-      {/* 1. Top Bar Integrada (Branding + Busca + Atalhos) */}
-      <section className="px-4 pt-3 pb-3 bg-white shadow-[0_2px_10px_rgba(45,49,66,0.03)] border-b border-[#EAE6DF]/60">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-2xl font-black tracking-tighter text-[#ff6b57] select-none">
-              SAGAS
-            </span>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-[#bfedd1] text-[#254f3a] uppercase tracking-wider">
-              Brasil
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentTab('favoritos')}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#171b2b] hover:text-[#ff6b57] active:scale-90 transition-all"
-              aria-label="Favoritos"
-            >
-              <Heart size={20} />
-            </button>
-            <button
-              onClick={() => setCurrentTab('carrinho')}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#171b2b] hover:text-[#ff6b57] relative active:scale-90 transition-all"
-              aria-label="Sacola de Compras"
-            >
-              <ShoppingBag size={20} />
-              {totalCartCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 bg-[#ff6b57] text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
-                  {totalCartCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setCurrentTab('perfil')}
-              className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 bg-[#FF6B57] flex items-center justify-center text-white ml-1 shadow-2xs hover:opacity-90 transition-opacity"
-              aria-label="Perfil"
-            >
-              {currentUser?.photoURL ? (
-                <img src={currentUser.photoURL} alt="Foto Perfil" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xs font-bold">M</span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Floating ergonomic search input with real-time feedback */}
-        <div className="relative flex items-center w-full">
-          <div className="absolute left-3.5 flex items-center pointer-events-none text-gray-400">
-            <Search size={18} />
-          </div>
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar vestidos, conjuntos, infantil..."
-            className="w-full h-11 pl-10 pr-10 rounded-full bg-[#ebedff]/40 text-[#171b2b] placeholder:text-gray-400 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#ff6b57]/30 transition-all border border-[#EAE6DF]/70"
-          />
-          {searchQuery ? (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center transition-colors"
-              title="Limpar busca"
-            >
-              <X size={14} />
-            </button>
-          ) : (
-            <button
-              onClick={() => setCurrentTab('categorias')}
-              className="absolute right-3 text-gray-400 hover:text-[#ff6b57] transition-colors"
-              title="Explorar Categorias"
-            >
-              <Mic size={18} />
-            </button>
-          )}
-        </div>
-      </section>
+    <div className="flex flex-col w-full pb-12 text-[#171b2b]">
 
       {searchQuery.trim().length > 0 ? (
         /* Real-Time Live Search Results Grid */
@@ -180,7 +104,7 @@ export const HomeScreen: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 mt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5 mt-2">
               {searchFilteredProducts.map((product) => {
                 const favorited = isFavorite(product.id);
                 return (
@@ -333,10 +257,10 @@ export const HomeScreen: React.FC = () => {
       </section>
 
       {/* 3. Hero Banner Carrossel (Inspiração Lifestyle Boutique) */}
-      <section className="px-4 pt-2 pb-1">
+      <section className="pt-2 pb-1">
         <div
           onClick={() => setCurrentTab('categorias')}
-          className="cursor-pointer relative w-full rounded-[24px] overflow-hidden shadow-md aspect-[16/10] bg-[#171b2b] flex flex-col justify-end p-5 group"
+          className="cursor-pointer relative w-full rounded-[24px] overflow-hidden shadow-md aspect-[16/10] sm:aspect-[21/9] lg:aspect-[24/9] min-h-[260px] sm:min-h-[360px] bg-[#171b2b] flex flex-col justify-end p-5 sm:p-8 lg:p-10 group"
         >
           {/* Background image from HTML snippet */}
           <img
@@ -425,7 +349,7 @@ export const HomeScreen: React.FC = () => {
               <article
                 key={item.id}
                 onClick={() => openProductDetail(item)}
-                className="w-36 flex flex-col bg-[#FAF9F6] rounded-2xl overflow-hidden shadow-xs cursor-pointer border border-[#EAE6DF] hover:shadow-md transition-all active:scale-98"
+                className="w-36 sm:w-44 flex flex-col bg-[#FAF9F6] rounded-2xl overflow-hidden shadow-xs cursor-pointer border border-[#EAE6DF] hover:shadow-md transition-all active:scale-98"
               >
                 <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
                   <img
@@ -482,11 +406,11 @@ export const HomeScreen: React.FC = () => {
       </section>
 
       {/* 5. Tiles Promocionais em 2 Colunas */}
-      <section className="px-4 mt-4 grid grid-cols-2 gap-3">
+      <section className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {/* Tile Feminino */}
         <div
           onClick={() => setCurrentTab('categorias')}
-          className="cursor-pointer relative rounded-2xl overflow-hidden aspect-[4/5] bg-gray-200 shadow-xs p-3 flex flex-col justify-end group"
+          className="cursor-pointer relative rounded-2xl overflow-hidden aspect-[4/5] sm:aspect-[16/9] bg-gray-200 shadow-xs p-5 flex flex-col justify-end group"
         >
           <img
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSaSSkKP6zkEITiQBSyAYHQj7a5wlMvMRvJtwTO-VqSyohXw6yY0TuyTaKL0mptIJ6IwZDBC2gY4Wl51ZT9p2Mu3128OE-Oi8UlIttfe2Df6JLnm8Kxjeek1BM_TWy0iQXAQSShdn3qN5Vx9I2EjCwi2oQhcrWe2foz0dClwWAtQs9Olo7nV0tnaFFOWhLUqrvy4l1M6EsOReyTs9s__lLMulX6Ps2majwsZ8THY8ICkx0YDrbox6JOg"
@@ -495,9 +419,9 @@ export const HomeScreen: React.FC = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent"></div>
           <div className="relative z-10 flex flex-col items-start gap-1">
-            <span className="text-sm font-black text-white">Moda Feminina</span>
-            <span className="text-[10px] font-bold text-[#bfedd1]">A partir de R$ 39,90</span>
-            <button className="mt-1 px-3 py-1 rounded-full bg-white text-[#171b2b] text-[10px] font-bold shadow-xs active:scale-95 transition-transform">
+            <span className="text-base sm:text-lg font-black text-white">Moda Feminina</span>
+            <span className="text-xs font-bold text-[#bfedd1]">A partir de R$ 39,90</span>
+            <button className="mt-2 px-4 py-1.5 rounded-full bg-white text-[#171b2b] text-xs font-bold shadow-xs active:scale-95 transition-transform">
               Ver Looks
             </button>
           </div>
@@ -506,7 +430,7 @@ export const HomeScreen: React.FC = () => {
         {/* Tile Infantil */}
         <div
           onClick={() => setCurrentTab('categorias')}
-          className="cursor-pointer relative rounded-2xl overflow-hidden aspect-[4/5] bg-gray-200 shadow-xs p-3 flex flex-col justify-end group"
+          className="cursor-pointer relative rounded-2xl overflow-hidden aspect-[4/5] sm:aspect-[16/9] bg-gray-200 shadow-xs p-5 flex flex-col justify-end group"
         >
           <img
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuAID3BRu9aO47gyQXLtbe0X3b-lfJHhicUGhAvDKHSs4bAmUZK8gOwZCFR7aonbfbo4H66Hxc9nWxzA2YFSeolsZ2sB8J0vf3tRXWpfmrVPCxBDcPsSoLE40bPsR7LmwHDHYnOL1KX22YtQdVh3xXUGm94llTsZyxXQEtltXomQ00ag4DoGJcW5DLLD-jd7YwolOTQbDgnSYvUGU0ZGcEl93e1WRpNzZkgUhdfKWZl4UolwLwveUkQZUQ"
@@ -515,27 +439,27 @@ export const HomeScreen: React.FC = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent"></div>
           <div className="relative z-10 flex flex-col items-start gap-1">
-            <span className="text-sm font-black text-white">Moda Infantil</span>
-            <span className="text-[10px] font-bold text-[#bfedd1]">Tamanhos 1 ao 14</span>
-            <button className="mt-1 px-3 py-1 rounded-full bg-white text-[#171b2b] text-[10px] font-bold shadow-xs active:scale-95 transition-transform">
+            <span className="text-base sm:text-lg font-black text-white">Moda Infantil</span>
+            <span className="text-xs font-bold text-[#bfedd1]">Tamanhos 1 ao 14</span>
+            <button className="mt-2 px-4 py-1.5 rounded-full bg-white text-[#171b2b] text-xs font-bold shadow-xs active:scale-95 transition-transform">
               Explorar
             </button>
           </div>
         </div>
       </section>
 
-      {/* 6. Grade de Produtos "Mais Vendidos" (2 Colunas, Mobile Standard) */}
-      <section className="px-4 mt-5 flex flex-col gap-3">
+      {/* 6. Grade de Produtos "Mais Vendidos" (Responsivo: 2 a 5 colunas) */}
+      <section className="mt-8 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-lg font-black text-[#171b2b]">Mais Vendidos</h2>
+            <h2 className="text-lg sm:text-xl font-black text-[#171b2b]">Mais Vendidos</h2>
             <Sparkles size={18} className="text-[#ff6b57]" />
           </div>
           <span className="text-xs text-gray-500 font-medium">Mais de 1.4k avaliações</span>
         </div>
 
-        {/* Grid 2 Colunas */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Grid Responsivo */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
           {bestSellers.map(product => {
             const favorited = isFavorite(product.id);
             return (

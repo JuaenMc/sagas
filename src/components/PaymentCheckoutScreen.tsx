@@ -234,7 +234,7 @@ export const PaymentCheckoutScreen: React.FC<PaymentCheckoutScreenProps> = ({ on
           </div>
         </div>
       ) : (
-        <div className="px-4 py-3 flex flex-col w-full max-w-md mx-auto space-y-4">
+        <div className="py-4 flex flex-col w-full max-w-4xl mx-auto space-y-5">
           {/* Collapsible Mini Order Summary */}
           <div className="bg-white rounded-2xl shadow-xs border border-[#F0ECE6] overflow-hidden transition-all duration-300">
             <button
@@ -635,7 +635,7 @@ export const PaymentCheckoutScreen: React.FC<PaymentCheckoutScreenProps> = ({ on
 
       {/* Sticky Bottom Dock */}
       {!isOrderFinished && (
-        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-xl p-4 border-t border-gray-100 shadow-xl z-40 max-w-md mx-auto">
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-xl p-4 border-t border-gray-100 shadow-xl z-40 w-full">
           <div className="flex items-center justify-between mb-2">
             <div className="flex flex-col">
               <span className="text-[10px] text-gray-400 font-bold uppercase">Total da Compra</span>

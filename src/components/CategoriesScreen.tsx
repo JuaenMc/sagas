@@ -56,34 +56,37 @@ export const CategoriesScreen: React.FC = () => {
   }, [allProducts, searchTerm, filterMax50, filterFreeShipping, sortBy]);
 
   return (
-    <div className="flex flex-col w-full pb-28 text-[#171b2b] relative">
-      {/* Top Header Bar matching Image 3 */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#EAE6DF] px-4 py-3 flex items-center justify-between shadow-xs">
-        <button
-          onClick={() => setCurrentTab('home')}
-          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 text-[#171b2b] transition-colors"
-          aria-label="Voltar para Home"
-        >
-          <ArrowLeft size={22} />
-        </button>
-
-        <div className="flex flex-col items-center text-center">
-          <h1 className="font-extrabold text-base text-[#171b2b]">Moda Infantil</h1>
-          <span className="text-[11px] text-gray-500 font-medium">Coleção Verão • 2 a 10 anos</span>
+    <div className="flex flex-col w-full pb-12 text-[#171b2b] relative">
+      {/* Category In-page Title & Breadcrumb */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-2 border-b border-[#EAE6DF]">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCurrentTab('home')}
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100 text-[#171b2b] transition-colors border border-gray-200"
+            aria-label="Voltar para Home"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="font-black text-lg sm:text-2xl text-[#171b2b]">Catálogo SAGAS Brasil</h1>
+            <span className="text-xs text-gray-500 font-medium">Coleção Verão • {displayedProducts.length} peças encontradas</span>
+          </div>
         </div>
 
-        <button
-          onClick={() => setCurrentTab('carrinho')}
-          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 relative text-[#171b2b]"
-          aria-label="Carrinho"
-        >
-          <ShoppingBag size={22} />
-          {totalCartCount > 0 && (
-            <span className="absolute top-1 right-1 bg-[#ff6b57] text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
-              {totalCartCount}
-            </span>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsFilterModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:border-[#FF6B57] transition shadow-2xs"
+          >
+            <SlidersHorizontal size={14} className="text-[#FF6B57]" />
+            <span>Filtros</span>
+            {activeFiltersCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#FF6B57] text-white text-[10px] flex items-center justify-center font-bold">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Search Bar with clear button */}
@@ -181,8 +184,8 @@ export const CategoriesScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 2-Column Product Grid matching Image 3 */}
-      <div className="px-4 grid grid-cols-2 gap-3">
+      {/* Responsive Product Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
         {displayedProducts.map(product => {
           const favorited = isFavorite(product.id);
           return (

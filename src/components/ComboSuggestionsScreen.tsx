@@ -141,9 +141,9 @@ export const ComboSuggestionsScreen: React.FC<ComboSuggestionsScreenProps> = ({ 
         </span>
       </div>
 
-      {/* Product Discovery Grid (2 columns) */}
+      {/* Product Discovery Grid (Responsive) */}
       <section className="px-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
           {comboProducts.map(product => {
             const isAdded = addedItems.includes(product.id);
             const favorited = isFavorite(product.id);
@@ -223,7 +223,7 @@ export const ComboSuggestionsScreen: React.FC<ComboSuggestionsScreenProps> = ({ 
       </section>
 
       {/* Sticky Bottom Floating Combo Bar */}
-      <aside className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md p-3 px-4 border-t border-gray-200 shadow-xl max-w-md mx-auto flex items-center justify-between gap-3">
+      <aside className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md p-3 px-4 border-t border-gray-200 shadow-xl w-full lg:hidden flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex -space-x-2.5 items-center">
             {cart.slice(0, 2).map((item, idx) => (

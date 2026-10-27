@@ -62,7 +62,7 @@ export const ProfileScreen: React.FC = () => {
         </div>
       </header>
 
-      <div className="px-4 pt-3 pb-6 flex flex-col w-full max-w-md mx-auto space-y-4">
+      <div className="py-4 flex flex-col w-full max-w-4xl mx-auto space-y-5">
         {/* Profile Header Hero Card */}
         <section className="relative overflow-hidden rounded-[24px] bg-gradient-to-b from-[#FFF5F2] via-white to-white p-5 border border-[#FFE8E2] shadow-[0_8px_24px_rgba(255,107,87,0.06)]">
           <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full bg-[#FF6B57]/10 blur-2xl pointer-events-none"></div>

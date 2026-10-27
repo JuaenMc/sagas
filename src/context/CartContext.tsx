@@ -55,6 +55,10 @@ interface CartContextType {
   viewMode: 'mobile' | 'web';
   setViewMode: (mode: 'mobile' | 'web') => void;
 
+  // Search
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+
   // Toast
   toastMessage: string | null;
   showToast: (msg: string) => void;
@@ -190,7 +194,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentTab, setCurrentTab] = useState<ScreenTab>('home');
   const [subScreen, setSubScreen] = useState<SubScreen>('none');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [viewMode, setViewMode] = useState<'mobile' | 'web'>('mobile');
+  const [viewMode, setViewMode] = useState<'mobile' | 'web'>('web');
+  const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isTechGuideOpen, setIsTechGuideOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -836,6 +841,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         closeProductDetail,
         viewMode,
         setViewMode,
+        searchQuery,
+        setSearchQuery,
         toastMessage,
         showToast,
         isTechGuideOpen,

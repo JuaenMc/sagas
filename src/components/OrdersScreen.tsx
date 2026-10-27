@@ -295,7 +295,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onBack }) => {
         </button>
       </header>
 
-      <div className="px-4 py-4 flex flex-col w-full max-w-md mx-auto space-y-4">
+      <div className="py-4 flex flex-col w-full max-w-4xl mx-auto space-y-4">
         {/* Search Input */}
         <div className="relative flex items-center w-full">
           <div className="absolute left-3.5 flex items-center pointer-events-none text-gray-400">

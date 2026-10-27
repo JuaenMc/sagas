@@ -80,7 +80,7 @@ export const FavoritesScreen: React.FC = () => {
         </button>
       </header>
 
-      <div className="px-4 py-3 flex flex-col w-full max-w-md mx-auto space-y-3">
+      <div className="py-4 flex flex-col w-full space-y-4">
         {/* Combo Progress & Incentive Banner matching HTML */}
         <section className="relative overflow-hidden bg-gradient-to-br from-white via-[#EBF7F0] to-white rounded-2xl p-4 shadow-xs border border-[#A8D5BA]/50">
           <div className="flex items-start justify-between gap-2 mb-2">
@@ -175,7 +175,7 @@ export const FavoritesScreen: React.FC = () => {
             <p className="text-xs text-gray-500">Salve suas peças favoritas navegando pela vitrine.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProducts.map(product => {
               const isAdded = addedIds.includes(product.id);
               return (
@@ -260,7 +260,7 @@ export const FavoritesScreen: React.FC = () => {
       </div>
 
       {/* Sticky Bottom Floating Combo Bar */}
-      <aside className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md p-3 px-4 border-t border-gray-200 shadow-xl max-w-md mx-auto flex items-center justify-between gap-3">
+      <aside className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md p-3 px-4 border-t border-gray-200 shadow-xl w-full lg:hidden flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-full bg-[#EBF7F0] text-[#2E6945] flex items-center justify-center shrink-0">
             <Tag size={16} />

@@ -463,12 +463,33 @@ export const CartScreen: React.FC = () => {
               <span className="text-[9px] text-gray-500">À vista</span>
             </button>
           </div>
+
+          {/* Desktop Checkout CTA */}
+          <div className="hidden lg:flex items-center justify-between pt-4 mt-2 border-t border-gray-100">
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-400 font-bold uppercase">Total a pagar</span>
+              <div className="text-2xl font-black text-[#171b2b]">
+                R$ {total.toFixed(2).replace('.', ',')}
+              </div>
+              <span className="text-xs font-bold text-[#3d6751]">
+                R$ {pixTotal.toFixed(2).replace('.', ',')} com 5% OFF no Pix
+              </span>
+            </div>
+
+            <button
+              onClick={() => openSubScreen('payment-checkout')}
+              className="py-4 px-8 rounded-full bg-[#ff6b57] hover:bg-[#ff5745] text-white font-extrabold text-sm shadow-md active:scale-95 transition-all flex items-center gap-2"
+            >
+              <span>Avançar para Pagamento</span>
+              <ArrowRight size={17} />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Sticky Bottom Bar matching Image 1 */}
+      {/* Sticky Bottom Bar on Mobile */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EAE6DF] p-3 px-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] max-w-md mx-auto flex items-center justify-between">
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EAE6DF] p-3 px-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] w-full lg:hidden flex items-center justify-between">
           <div className="flex flex-col">
             <span className="text-[10px] text-gray-400 font-medium">Total a pagar</span>
             <div className="text-lg font-black text-[#171b2b] leading-tight">

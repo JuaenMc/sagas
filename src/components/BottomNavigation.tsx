@@ -46,7 +46,7 @@ export const BottomNavigation: React.FC = () => {
   };
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#EAE6DF] shadow-[0_-4px_16px_rgba(0,0,0,0.04)] max-w-md mx-auto">
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#EAE6DF] shadow-[0_-4px_16px_rgba(0,0,0,0.04)] w-full">
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map(item => {
           const isActive = currentTab === item.tab && !selectedProduct;

@@ -110,9 +110,11 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
         </div>
       </div>
 
-      {/* Main Hero Visual Gallery */}
-      <div className="px-4 mb-4">
-        <div className="relative w-full aspect-[3/4] rounded-[28px] overflow-hidden bg-gray-100 shadow-md border border-[#EAE6DF]">
+      {/* Responsive 2-Column Product Detail Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-6">
+        {/* Left: Gallery Column */}
+        <div className="lg:col-span-6 flex flex-col">
+          <div className="relative w-full aspect-[3/4] rounded-[28px] overflow-hidden bg-gray-100 shadow-md border border-[#EAE6DF]">
           <img
             src={galleryImages[currentImageIndex] || galleryImages[0]}
             alt={product.name}
@@ -194,8 +196,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
         </div>
       </div>
 
-      {/* Product Vital Information */}
-      <div className="px-4 flex flex-col gap-3">
+      {/* Right: Product Vital Information Column */}
+      <div className="lg:col-span-6 flex flex-col gap-4">
         {/* Collection & Rating */}
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-extrabold text-[#3d6751] uppercase tracking-wider">
@@ -492,10 +494,30 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
             )}
           </div>
         </div>
+
+        {/* Desktop CTA Action Buttons */}
+          <div className="hidden lg:flex items-center gap-3 pt-3">
+            <button
+              onClick={handleAddToCart}
+              className="flex-1 py-3.5 px-4 rounded-full border-2 border-[#ff6b57] text-[#ff6b57] font-bold text-xs hover:bg-[#ff6b57]/5 active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-xs"
+            >
+              <ShoppingBag size={18} />
+              <span>Adicionar ao Carrinho</span>
+            </button>
+
+            <button
+              onClick={handleBuyNow}
+              className="flex-1 py-3.5 px-4 rounded-full bg-[#ff6b57] hover:bg-[#ff5745] text-white font-extrabold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+            >
+              <Lock size={16} />
+              <span>Comprar Agora</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Sticky Bottom Bar matching Image 6 */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EAE6DF] p-3 px-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] max-w-md mx-auto">
+      {/* Sticky Bottom Bar on Mobile */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EAE6DF] p-3 px-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] w-full lg:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={handleAddToCart}
