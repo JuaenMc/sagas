@@ -27,6 +27,8 @@ export interface Product {
   isComboEligible: boolean;
   description: string;
   fabricInfo: string;
+  title?: string;
+  coverImageUrl?: string;
   measurementsInfo?: string;
   masterSku?: string;
   costPrice?: number;
@@ -46,6 +48,8 @@ export interface CartItem {
   quantity: number;
   isComboEligible: boolean;
   comboTag?: string;
+  variationSku?: string;
+  variationId?: string;
 }
 
 export type PaymentMethod = 'pix' | 'credit_card' | 'boleto';

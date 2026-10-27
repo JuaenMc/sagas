@@ -8,7 +8,7 @@ import { erpClient } from '../services/erpClient';
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Product, color: string, size: string, quantity?: number) => void;
+  addToCart: (product: Product, color: string, size: string, quantity?: number, variationSku?: string, variationId?: string) => void;
   removeFromCart: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, newQty: number) => void;
   clearCart: () => void;
@@ -99,6 +99,8 @@ interface CartContextType {
 
   // Dynamic Products Catalog (ERP Sincronizado + Fallback Local)
   products: Product[];
+  isLoadingProducts: boolean;
+  productsError: string | null;
   isSyncedWithErp: boolean;
   fetchProductsFromERP: () => Promise<void>;
   addProduct: (product: Product) => Promise<void>;
@@ -215,6 +217,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Dynamic Products Catalog (ERP Sincronizado + Fallback Local)
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [isSyncedWithErp, setIsSyncedWithErp] = useState<boolean>(false);
 
   // Store & Merchant Gateway Settings
@@ -365,6 +369,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sincronização do catálogo com o ERP Backend (com fallback offline)
   const fetchProductsFromERP = async () => {
+    setIsLoadingProducts(true);
+    setProductsError(null);
     try {
       const erpProducts = await erpClient.getProducts();
       if (erpProducts && erpProducts.length > 0) {
@@ -375,13 +381,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('[CartContext] ERP retornou lista vazia ou falhou. Mantendo catálogo estático como fallback.');
         setProducts(PRODUCTS);
         setIsSyncedWithErp(false);
-        showToast('Modo offline: catálogo local');
       }
     } catch (err: any) {
       console.warn('[CartContext] Falha ao consultar ERP, usando fallback local:', err?.message);
       setProducts(PRODUCTS);
+      setProductsError('Servidor ERP temporariamente indisponível. Exibindo catálogo em cache.');
       setIsSyncedWithErp(false);
-      showToast('Modo offline: catálogo local');
+    } finally {
+      setIsLoadingProducts(false);
     }
   };
 
@@ -585,32 +592,62 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToastMessage(msg);
   };
 
-  const addToCart = (product: Product, color: string, size: string, quantity = 1) => {
+  const addToCart = (
+    product: Product,
+    color: string,
+    size: string,
+    quantity = 1,
+    variationSku?: string,
+    variationId?: string
+  ) => {
+    // Resolver SKU e ID da variação
+    let targetSku = variationSku;
+    let targetVarId = variationId;
+    if (product.variations && product.variations.length > 0) {
+      const matched = product.variations.find(
+        v => (targetSku && v.sku === targetSku) ||
+          (v.size?.toLowerCase() === size?.toLowerCase() && v.color?.toLowerCase() === color?.toLowerCase())
+      ) || product.variations.find(v => v.size?.toLowerCase() === size?.toLowerCase()) || product.variations[0];
+
+      if (matched) {
+        if (!targetSku) targetSku = matched.sku;
+        if (!targetVarId) targetVarId = matched.id;
+      }
+    }
+
     const existingIndex = cart.findIndex(
-      item => item.productId === product.id && item.selectedColor === color && item.selectedSize === size
+      item => (targetSku && item.variationSku === targetSku) ||
+        (item.productId === product.id && item.selectedColor === color && item.selectedSize === size)
     );
+
+    const displayName = product.title || product.name;
+    const coverImg = product.coverImageUrl || (product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
 
     if (existingIndex > -1) {
       const newCart = [...cart];
       newCart[existingIndex].quantity += quantity;
+      if (targetSku) newCart[existingIndex].variationSku = targetSku;
+      if (targetVarId) newCart[existingIndex].variationId = targetVarId;
       setCart(newCart);
     } else {
       const newItem: CartItem = {
-        id: `cart-${product.id}-${color}-${size}-${Date.now()}`,
+        id: `cart-${product.id}-${color}-${size}-${targetSku || Date.now()}`,
         productId: product.id,
-        name: product.name,
-        image: product.images[0],
+        name: displayName,
+        image: coverImg,
         price: product.price,
         originalPrice: product.originalPrice,
         selectedColor: color,
         selectedSize: size,
         quantity,
         isComboEligible: product.isComboEligible,
-        comboTag: product.isComboEligible ? 'Combo' : undefined
+        comboTag: product.isComboEligible ? 'Combo' : undefined,
+        variationSku: targetSku,
+        variationId: targetVarId,
       };
       setCart([...cart, newItem]);
     }
-    showToast(`"${product.name}" adicionado à sacola!`);
+    showToast(`"${displayName}" adicionado à sacola!`);
   };
 
   const removeFromCart = (cartItemId: string) => {
@@ -648,17 +685,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const orderItems = cart.map(item => {
         const prod = products.find(p => p.id === item.productId);
-        let varId = item.productId;
+        let varId = item.variationId;
+        let varSku = item.variationSku;
+
         if (prod && prod.variations && prod.variations.length > 0) {
           const matched = prod.variations.find(v => 
-            v.size?.toLowerCase() === item.selectedSize?.toLowerCase() &&
-            v.color?.toLowerCase() === item.selectedColor?.toLowerCase()
+            (varSku && v.sku === varSku) ||
+            (v.size?.toLowerCase() === item.selectedSize?.toLowerCase() &&
+             v.color?.toLowerCase() === item.selectedColor?.toLowerCase())
           ) || prod.variations.find(v => v.size?.toLowerCase() === item.selectedSize?.toLowerCase()) || prod.variations[0];
-          varId = matched.id;
+
+          if (matched) {
+            varId = matched.id;
+            varSku = matched.sku;
+          }
         }
 
         return {
-          variationId: varId,
+          variationSku: varSku || varId || item.productId,
+          variationId: varId || item.productId,
           quantity: item.quantity,
           unitPrice: item.price
         };
@@ -677,7 +722,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         channel: 'APP_SAGAS',
         customer: customerPayload,
         items: orderItems,
+        subtotal: Math.round(subtotal * 100) / 100,
         shipping: { cost: 0, method: 'CORREIOS_PAC' },
+        total: Math.round(total * 100) / 100,
         paymentMethod: method,
         couponCode: appliedCoupon || undefined
       });
@@ -868,6 +915,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createCheckoutOrder,
         confirmOrderPayment,
         products,
+        isLoadingProducts,
+        productsError,
         isSyncedWithErp,
         fetchProductsFromERP,
         addProduct,

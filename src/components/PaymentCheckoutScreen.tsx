@@ -103,9 +103,17 @@ export const PaymentCheckoutScreen: React.FC<PaymentCheckoutScreenProps> = ({ on
       if (!orderId) {
         showToast('Reservando estoque no ERP...');
         const createRes = await createCheckoutOrder(pMethod);
-        if (createRes && createRes.orderId) {
+        if (createRes && (createRes.orderId || createRes.orderNumber)) {
           orderId = createRes.orderId;
           orderNumber = createRes.orderNumber;
+
+          // Se a API retornar link de checkout externo (Mercado Pago / Gateway)
+          const paymentUrl = createRes.paymentUrl || createRes.initPoint || createRes.checkoutUrl;
+          if (paymentUrl && typeof paymentUrl === 'string' && paymentUrl.startsWith('http')) {
+            clearCart();
+            window.location.href = paymentUrl;
+            return;
+          }
         } else {
           setIsProcessing(false);
           return;

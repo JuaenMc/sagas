@@ -120,13 +120,13 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a 
-                  href={`https://wa.me/${storeSettings?.whatsappNumber || '5511998765432'}?text=Ol%C3%A1%2C%20gostaria%20de%20tirar%20uma%20d%C3%BAvida%20sobre%20meu%20pedido%20na%20SAGAS`}
+                  href={`https://wa.me/${storeSettings?.whatsappNumber || '556791188356'}?text=Ol%C3%A1%2C%20gostaria%20de%20tirar%20uma%20d%C3%BAvida%20sobre%20meu%20pedido%20na%20SAGAS`}
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="hover:text-white transition flex items-center gap-1.5 text-emerald-400 font-semibold"
                 >
                   <MessageCircle size={14} />
-                  <span>WhatsApp: (11) 99876-5432</span>
+                  <span>WhatsApp: (67) 9118-8356</span>
                 </a>
               </li>
               <li className="text-[11px] text-gray-500">
@@ -158,8 +158,8 @@ export const Footer: React.FC = () => {
 
         {/* Copyright */}
         <div className="pt-8 border-t border-gray-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-gray-500 text-center sm:text-left">
-          <p>© 2025 SAGAS Brasil Confecções Ltda. Todos os direitos reservados.</p>
-          <p>CNPJ: 45.123.456/0001-89 • São Paulo - SP</p>
+          <p>© 2026 SAGAS Brasil Confecções Ltda. Todos os direitos reservados.</p>
+          <p>CNPJ: 69.249.479/0001-09 • São Paulo - SP</p>
         </div>
 
       </div>

@@ -497,7 +497,7 @@ export const Header: React.FC = () => {
             <div className="p-4 border-t border-gray-100 bg-[#FAF9F6] text-[11px] text-gray-500 flex flex-col gap-1">
               <span className="font-bold text-[#171B2B]">SAGAS Brasil E-Commerce</span>
               <span>Moda Feminina & Infantil com preço justo</span>
-              <span>SAC WhatsApp: (11) 99876-5432</span>
+              <span>SAC WhatsApp: (67) 9118-8356</span>
             </div>
           </aside>
         </div>

@@ -4,11 +4,11 @@ import { PRODUCTS } from '../data/products';
 import { Product } from '../types';
 import { 
   ArrowLeft, ShoppingBag, Search, X, SlidersHorizontal, Check, 
-  Star, Heart, ArrowUpDown, ShieldCheck, RefreshCw 
+  Star, Heart, ArrowUpDown, ShieldCheck, RefreshCw, AlertCircle 
 } from 'lucide-react';
 
 export const CategoriesScreen: React.FC = () => {
-  const { openProductDetail, toggleFavorite, isFavorite, setCurrentTab, cart, products } = useCart();
+  const { openProductDetail, toggleFavorite, isFavorite, setCurrentTab, cart, products, isLoadingProducts, productsError, fetchProductsFromERP } = useCart();
   const allProducts = products && products.length > 0 ? products : PRODUCTS;
   
   const [searchTerm, setSearchTerm] = useState('Vestidos e conjuntos');
@@ -163,10 +163,27 @@ export const CategoriesScreen: React.FC = () => {
         )}
       </div>
 
+      {/* Banner de Erro/Offline se houver */}
+      {productsError && (
+        <div className="mx-4 my-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs text-amber-800">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-amber-600 shrink-0" />
+            <span>{productsError}</span>
+          </div>
+          <button
+            onClick={() => fetchProductsFromERP()}
+            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
+          >
+            <RefreshCw size={11} />
+            <span>Reconectar</span>
+          </button>
+        </div>
+      )}
+
       {/* Results Header: Count & Sorting */}
       <div className="px-4 py-3 flex items-center justify-between text-xs text-gray-600">
         <span className="font-semibold">
-          <strong className="text-[#171b2b]">{displayedProducts.length > 0 ? '128' : '0'}</strong> produtos encontrados
+          <strong className="text-[#171b2b]">{displayedProducts.length}</strong> produtos encontrados
         </span>
 
         <div className="flex items-center gap-1">
@@ -185,84 +202,105 @@ export const CategoriesScreen: React.FC = () => {
       </div>
 
       {/* Responsive Product Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-        {displayedProducts.map(product => {
-          const favorited = isFavorite(product.id);
-          return (
-            <article
-              key={product.id}
-              onClick={() => openProductDetail(product)}
-              className="cursor-pointer flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] hover:shadow-md transition-all relative group"
-            >
-              {/* Photo Box */}
-              <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
-                <img
-                  src={product.images[0]}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5 px-4">
+        {isLoadingProducts ? (
+          [...Array(6)].map((_, i) => (
+            <div key={i} className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">
+              <div className="w-full aspect-[3/4] bg-stone-200"></div>
+              <div className="p-3 flex flex-col gap-2">
+                <div className="h-3 w-16 bg-stone-200 rounded"></div>
+                <div className="h-4 w-3/4 bg-stone-200 rounded"></div>
+                <div className="h-5 w-20 bg-stone-200 rounded mt-1"></div>
+              </div>
+            </div>
+          ))
+        ) : (
+          displayedProducts.map(product => {
+            const favorited = isFavorite(product.id);
+            const displayImg = product.coverImageUrl || (product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
+            const displayName = product.title || product.name;
+            const isOutOfStock = (product.stock ?? 1) <= 0;
 
-                {/* Badges on Top Left */}
-                <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
-                  {product.secondaryBadge && (
-                    <span className="px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-extrabold shadow-xs">
-                      {product.secondaryBadge}
-                    </span>
-                  )}
-                  {product.badge && (
-                    <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#171b2b] text-[10px] font-bold shadow-xs">
-                      {product.badge}
-                    </span>
-                  )}
+            return (
+              <article
+                key={product.id}
+                onClick={() => openProductDetail(product)}
+                className="cursor-pointer flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] hover:shadow-md transition-all relative group"
+              >
+                {/* Photo Box */}
+                <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
+                  <img
+                    src={displayImg}
+                    alt={displayName}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+
+                  {/* Badges on Top Left */}
+                  <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    {isOutOfStock ? (
+                      <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-extrabold shadow-xs">
+                        Esgotado
+                      </span>
+                    ) : product.secondaryBadge ? (
+                      <span className="px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-extrabold shadow-xs">
+                        {product.secondaryBadge}
+                      </span>
+                    ) : null}
+                    {product.badge && !isOutOfStock && (
+                      <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#171b2b] text-[10px] font-bold shadow-xs">
+                        {product.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Floating Heart on Top Right */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(product.id);
+                    }}
+                    className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center shadow-xs active:scale-90 transition-transform ${
+                      favorited ? 'text-[#ff6b57]' : 'text-gray-600 hover:text-black'
+                    }`}
+                    aria-label="Favoritar"
+                  >
+                    <Heart size={16} className={favorited ? 'fill-[#ff6b57]' : ''} />
+                  </button>
                 </div>
 
-                {/* Floating Heart on Top Right */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(product.id);
-                  }}
-                  className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center shadow-xs active:scale-90 transition-transform ${
-                    favorited ? 'text-[#ff6b57]' : 'text-gray-600 hover:text-black'
-                  }`}
-                  aria-label="Favoritar"
-                >
-                  <Heart size={16} className={favorited ? 'fill-[#ff6b57]' : ''} />
-                </button>
-              </div>
+                {/* Product Info */}
+                <div className="p-3 flex flex-col flex-1 justify-between gap-1.5">
+                  <div>
+                    <h3 className="text-xs font-semibold text-[#171b2b] line-clamp-1 leading-snug">
+                      {displayName}
+                    </h3>
+                    <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-500">
+                      <Star size={13} className="text-amber-500 fill-amber-500" />
+                      <span className="font-bold text-[#171b2b]">{product.rating}</span>
+                      <span>({product.reviewsCount})</span>
+                    </div>
+                  </div>
 
-              {/* Product Info */}
-              <div className="p-3 flex flex-col flex-1 justify-between gap-1.5">
-                <div>
-                  {product.badge && (
-                    <span className="inline-block px-2 py-0.5 rounded-md bg-[#ffdcc4]/60 text-[#8e4e14] text-[10px] font-bold mb-1">
-                      {product.badge}
+                  <div className="flex flex-col pt-1">
+                    {product.originalPrice && (
+                      <span className="text-[11px] text-gray-400 line-through">
+                        R$ {product.originalPrice.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                    <span className="text-base font-black text-[#ae3123] leading-none mt-0.5">
+                      R$ {product.price.toFixed(2).replace('.', ',')}
                     </span>
-                  )}
-                  <h3 className="text-xs font-semibold text-[#171b2b] line-clamp-1 leading-snug">
-                    {product.name}
-                  </h3>
-                  <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-500">
-                    <Star size={13} className="text-amber-500 fill-amber-500" />
-                    <span className="font-bold text-[#171b2b]">{product.rating}</span>
-                    <span>({product.reviewsCount})</span>
+                    {product.variations && product.variations.length > 0 && (
+                      <span className="text-[10px] text-gray-400 mt-0.5">
+                        {product.variations.length} {product.variations.length === 1 ? 'variação' : 'variações'}
+                      </span>
+                    )}
                   </div>
                 </div>
-
-                <div className="flex flex-col pt-1">
-                  {product.originalPrice && (
-                    <span className="text-[11px] text-gray-400 line-through">
-                      R$ {product.originalPrice.toFixed(2).replace('.', ',')}
-                    </span>
-                  )}
-                  <span className="text-base font-black text-[#ae3123] leading-none mt-0.5">
-                    R$ {product.price.toFixed(2).replace('.', ',')}
-                  </span>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })
+        )}
       </div>
 
       {/* Bottom Guarantee Banner matching Image 3 */}

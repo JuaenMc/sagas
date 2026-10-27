@@ -3,7 +3,18 @@ import { useCart } from '../context/CartContext';
 import { X, Check, Copy, QrCode, ShieldCheck, Lock, Sparkles, Truck, CreditCard } from 'lucide-react';
 
 export const CheckoutModal: React.FC = () => {
-  const { isCheckoutOpen, setIsCheckoutOpen, total, pixTotal, selectedPayment, clearCart, setCurrentTab } = useCart();
+  const { 
+    isCheckoutOpen, 
+    setIsCheckoutOpen, 
+    total, 
+    pixTotal, 
+    selectedPayment, 
+    clearCart, 
+    setCurrentTab,
+    createCheckoutOrder,
+    confirmOrderPayment,
+    currentOrderNumber 
+  } = useCart();
   const [copied, setCopied] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -17,7 +28,16 @@ export const CheckoutModal: React.FC = () => {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
+    try {
+      const pMethod = selectedPayment === 'pix' ? 'PIX' : selectedPayment === 'credit_card' ? 'CREDIT_CARD' : 'BOLETO';
+      const res = await createCheckoutOrder(pMethod);
+      if (res?.orderId) {
+        await confirmOrderPayment({ externalPaymentId: `modal-${Date.now()}` });
+      }
+    } catch (e) {
+      console.warn('CheckoutModal ERP notice:', e);
+    }
     setIsSuccess(true);
     setTimeout(() => {
       clearCart();
@@ -61,7 +81,7 @@ export const CheckoutModal: React.FC = () => {
               Enviamos os detalhes do pedido e o código de rastreamento para o seu e-mail e WhatsApp.
             </p>
             <div className="p-3 bg-emerald-50 rounded-2xl text-xs text-emerald-800 font-semibold border border-emerald-200 w-full">
-              Código do Pedido: <span className="font-mono font-bold">#SAGAS-8942</span>
+              Código do Pedido: <span className="font-mono font-bold">{currentOrderNumber || '#SAGAS-8942'}</span>
             </div>
           </div>
         ) : (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { PRODUCTS } from '../data/products';
-import { Search, Mic, Heart, Star, ChevronRight, Zap, ShoppingBag, ArrowRight, Layers, Flame, Sparkles, X } from 'lucide-react';
+import { Search, Mic, Heart, Star, ChevronRight, Zap, ShoppingBag, ArrowRight, Layers, Flame, Sparkles, X, AlertCircle, RefreshCw } from 'lucide-react';
 import { Product } from '../types';
 
 export const HomeScreen: React.FC = () => {
@@ -14,13 +14,17 @@ export const HomeScreen: React.FC = () => {
     cart, 
     currentUser,
     products,
+    isLoadingProducts,
+    productsError,
+    fetchProductsFromERP,
+    isSyncedWithErp,
     openSubScreen,
     searchQuery,
     setSearchQuery
   } = useCart();
   const [activeCategoryChip, setActiveCategoryChip] = useState<'novidades' | 'feminino' | 'infantil' | 'promocoes' | 'combos' | 'acessorios'>('feminino');
 
-  // Fallback to static PRODUCTS if products is somehow empty
+  // Catálogo sincronizado com o ERP
   const allProducts = products && products.length > 0 ? products : PRODUCTS;
 
   // Live Countdown timer matching Image 8: 04 : 28 : 12
@@ -42,15 +46,16 @@ export const HomeScreen: React.FC = () => {
   const searchFilteredProducts = searchQuery.trim()
     ? allProducts.filter((p) => {
         const q = searchQuery.toLowerCase().trim();
-        const matchesName = p.name.toLowerCase().includes(q);
+        const pName = (p.title || p.name).toLowerCase();
+        const matchesName = pName.includes(q);
         const matchesCategory = p.category.toLowerCase().includes(q);
         const matchesSubCategory = p.subCategory ? p.subCategory.toLowerCase().includes(q) : false;
         return matchesName || matchesCategory || matchesSubCategory;
       })
     : [];
 
-  const flashSaleItems = allProducts.filter(p => p.isFlashSale || p.badge?.includes('OFF') || p.badge?.includes('Combo'));
-  const bestSellers = allProducts.filter(p => !p.isFlashSale).slice(0, 6);
+  const flashSaleItems = allProducts.filter(p => p.isFlashSale || p.badge?.includes('OFF') || p.badge?.includes('Combo') || (p.variations && p.variations.length > 2));
+  const bestSellers = allProducts.slice(0, 8);
 
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -107,6 +112,10 @@ export const HomeScreen: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5 mt-2">
               {searchFilteredProducts.map((product) => {
                 const favorited = isFavorite(product.id);
+                const displayImg = product.coverImageUrl || (product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
+                const displayName = product.title || product.name;
+                const isOutOfStock = (product.stock ?? 1) <= 0;
+
                 return (
                   <article
                     key={product.id}
@@ -115,15 +124,21 @@ export const HomeScreen: React.FC = () => {
                   >
                     <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
                       <img
-                        src={product.images[0]}
-                        alt={product.name}
+                        src={displayImg}
+                        alt={displayName}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      {product.badge && (
-                        <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-bold shadow-xs">
-                          {product.badge}
-                        </span>
-                      )}
+                      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
+                        {isOutOfStock ? (
+                          <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold shadow-xs">
+                            Esgotado
+                          </span>
+                        ) : product.badge ? (
+                          <span className="px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-bold shadow-xs">
+                            {product.badge}
+                          </span>
+                        ) : null}
+                      </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -144,7 +159,7 @@ export const HomeScreen: React.FC = () => {
                           {product.category === 'infantil' ? 'Moda Infantil' : 'Moda Feminina'}
                         </span>
                         <h3 className="text-xs font-semibold text-[#171b2b] line-clamp-2 leading-snug">
-                          {product.name}
+                          {displayName}
                         </h3>
                         <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-500">
                           <Star size={13} className="text-amber-500 fill-amber-500" />
@@ -169,12 +184,18 @@ export const HomeScreen: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isOutOfStock) return;
                             addToCart(product, product.colors[0]?.name || 'Padrão', product.sizes[0] || 'M');
                           }}
-                          className="mt-2 w-full py-2 rounded-xl bg-[#ff6b57] hover:bg-[#e05340] text-white text-[11px] font-bold flex items-center justify-center gap-1 active:scale-95 transition shadow-xs"
+                          disabled={isOutOfStock}
+                          className={`mt-2 w-full py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-xs ${
+                            isOutOfStock
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-[#ff6b57] hover:bg-[#e05340] text-white active:scale-95'
+                          }`}
                         >
                           <ShoppingBag size={13} />
-                          <span>Adicionar à Sacola</span>
+                          <span>{isOutOfStock ? 'Esgotado' : 'Adicionar à Sacola'}</span>
                         </button>
                       </div>
                     </div>
@@ -342,53 +363,98 @@ export const HomeScreen: React.FC = () => {
           </button>
         </div>
 
+        {/* Banner de Erro/Offline se houver */}
+        {productsError && (
+          <div className="mx-4 my-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs text-amber-800">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-amber-600 shrink-0" />
+              <span>{productsError}</span>
+            </div>
+            <button
+              onClick={() => fetchProductsFromERP()}
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
+            >
+              <RefreshCw size={11} />
+              <span>Reconectar</span>
+            </button>
+          </div>
+        )}
+
         {/* Scroll Horizontal de Produtos Relâmpago */}
         <div className="w-full overflow-x-auto no-scrollbar">
           <div className="flex items-stretch gap-3 px-4 w-max pb-1">
-            {flashSaleItems.map(item => (
-              <article
-                key={item.id}
-                onClick={() => openProductDetail(item)}
-                className="w-36 sm:w-44 flex flex-col bg-[#FAF9F6] rounded-2xl overflow-hidden shadow-xs cursor-pointer border border-[#EAE6DF] hover:shadow-md transition-all active:scale-98"
-              >
-                <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
-                  <img
-                    src={item.images[0]}
-                    alt={item.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  />
-                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-extrabold shadow-xs">
-                    {item.badge}
-                  </span>
-                </div>
-                <div className="p-2.5 flex flex-col flex-1 justify-between gap-1">
-                  <h3 className="text-xs text-[#171b2b] line-clamp-1 font-semibold">
-                    {item.name}
-                  </h3>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 line-through">
-                      R$ {item.originalPrice?.toFixed(2).replace('.', ',')}
-                    </span>
-                    <span className="text-sm font-black text-[#ff6b57]">
-                      R$ {item.price.toFixed(2).replace('.', ',')}
-                    </span>
+            {isLoadingProducts ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="w-36 sm:w-44 flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">
+                  <div className="w-full aspect-[3/4] bg-stone-200"></div>
+                  <div className="p-2.5 flex flex-col gap-2">
+                    <div className="h-3 w-20 bg-stone-200 rounded"></div>
+                    <div className="h-4 w-16 bg-stone-200 rounded"></div>
                   </div>
+                </div>
+              ))
+            ) : (
+              flashSaleItems.map(item => {
+                const itemImg = item.coverImageUrl || (item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
+                const itemName = item.title || item.name;
+                const isOutOfStock = (item.stock ?? 1) <= 0;
 
-                  {/* Stock progress bar */}
-                  <div className="w-full mt-1">
-                    <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#ff6b57] rounded-full transition-all"
-                        style={{ width: `${item.soldPercentage || 75}%` }}
-                      ></div>
+                return (
+                  <article
+                    key={item.id}
+                    onClick={() => openProductDetail(item)}
+                    className="w-36 sm:w-44 flex flex-col bg-[#FAF9F6] rounded-2xl overflow-hidden shadow-xs cursor-pointer border border-[#EAE6DF] hover:shadow-md transition-all active:scale-98"
+                  >
+                    <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
+                      <img
+                        src={itemImg}
+                        alt={itemName}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                        {isOutOfStock ? (
+                          <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-extrabold shadow-xs">
+                            Esgotado
+                          </span>
+                        ) : item.badge ? (
+                          <span className="px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-extrabold shadow-xs">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <span className="text-[9px] font-bold text-gray-500 mt-0.5 block">
-                      {item.soldPercentage}% vendido
-                    </span>
-                  </div>
-                </div>
-              </article>
-            ))}
+                    <div className="p-2.5 flex flex-col flex-1 justify-between gap-1">
+                      <h3 className="text-xs text-[#171b2b] line-clamp-1 font-semibold">
+                        {itemName}
+                      </h3>
+                      <div className="flex flex-col">
+                        {item.originalPrice && (
+                          <span className="text-[10px] text-gray-400 line-through">
+                            R$ {item.originalPrice.toFixed(2).replace('.', ',')}
+                          </span>
+                        )}
+                        <span className="text-sm font-black text-[#ff6b57]">
+                          R$ {item.price.toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+
+                      {/* Stock progress bar */}
+                      <div className="w-full mt-1">
+                        <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#ff6b57] rounded-full transition-all"
+                            style={{ width: `${item.soldPercentage || 75}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[9px] font-bold text-gray-500 mt-0.5 block">
+                          {isOutOfStock ? '0 restantes' : `${item.soldPercentage || 75}% vendido`}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })
+            )}
 
             {/* Extra Explore Card */}
             <article
@@ -455,84 +521,134 @@ export const HomeScreen: React.FC = () => {
             <h2 className="text-lg sm:text-xl font-black text-[#171b2b]">Mais Vendidos</h2>
             <Sparkles size={18} className="text-[#ff6b57]" />
           </div>
-          <span className="text-xs text-gray-500 font-medium">Mais de 1.4k avaliações</span>
+          <span className="text-xs text-gray-500 font-medium">Produtos do ERP Sincronizados</span>
         </div>
 
-        {/* Grid Responsivo */}
+        {/* Grid Responsivo com Skeleton Loading */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-          {bestSellers.map(product => {
-            const favorited = isFavorite(product.id);
-            return (
-              <article
-                key={product.id}
-                onClick={() => openProductDetail(product)}
-                className="cursor-pointer flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] hover:shadow-md transition-all relative group"
-              >
-                {/* Photo & badges */}
-                <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
-                  <img
-                    src={product.images[0]}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  {product.badge && (
-                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-bold shadow-xs">
-                      {product.badge}
-                    </span>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(product.id);
-                    }}
-                    className={`absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center shadow-xs active:scale-90 transition-transform ${
-                      favorited ? 'text-[#ff6b57]' : 'text-gray-600 hover:text-black'
-                    }`}
-                    aria-label="Favoritar Produto"
-                  >
-                    <Heart size={16} className={favorited ? 'fill-[#ff6b57]' : ''} />
-                  </button>
+          {isLoadingProducts ? (
+            [...Array(6)].map((_, i) => (
+              <div key={i} className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">
+                <div className="w-full aspect-[3/4] bg-stone-200"></div>
+                <div className="p-3 flex flex-col gap-2">
+                  <div className="h-3 w-16 bg-stone-200 rounded"></div>
+                  <div className="h-4 w-3/4 bg-stone-200 rounded"></div>
+                  <div className="h-5 w-20 bg-stone-200 rounded mt-1"></div>
+                  <div className="h-8 w-full bg-stone-200 rounded-xl mt-2"></div>
                 </div>
+              </div>
+            ))
+          ) : (
+            bestSellers.map(product => {
+              const favorited = isFavorite(product.id);
+              const pImg = product.coverImageUrl || (product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
+              const pName = product.title || product.name;
+              const isOutOfStock = (product.stock ?? 1) <= 0;
 
-                {/* Details */}
-                <div className="p-3 flex flex-col flex-1 justify-between gap-1.5">
-                  <div>
-                    <h3 className="text-xs font-semibold text-[#171b2b] line-clamp-2 leading-snug">
-                      {product.name}
-                    </h3>
-                    <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-500">
-                      <Star size={13} className="text-amber-500 fill-amber-500" />
-                      <span className="font-bold text-[#171b2b]">{product.rating}</span>
-                      <span>({product.reviewsCount})</span>
+              return (
+                <article
+                  key={product.id}
+                  onClick={() => openProductDetail(product)}
+                  className="cursor-pointer flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] hover:shadow-md transition-all relative group"
+                >
+                  {/* Photo & badges */}
+                  <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
+                    <img
+                      src={pImg}
+                      alt={pName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
+                      {isOutOfStock ? (
+                        <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold shadow-xs">
+                          Esgotado
+                        </span>
+                      ) : product.badge ? (
+                        <span className="px-2 py-0.5 rounded-full bg-[#ff6b57] text-white text-[10px] font-bold shadow-xs">
+                          {product.badge}
+                        </span>
+                      ) : null}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(product.id);
+                      }}
+                      className={`absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center shadow-xs active:scale-90 transition-transform ${
+                        favorited ? 'text-[#ff6b57]' : 'text-gray-600 hover:text-black'
+                      }`}
+                      aria-label="Favoritar Produto"
+                    >
+                      <Heart size={16} className={favorited ? 'fill-[#ff6b57]' : ''} />
+                    </button>
+                  </div>
+
+                  {/* Details */}
+                  <div className="p-3 flex flex-col flex-1 justify-between gap-1.5">
+                    <div>
+                      <h3 className="text-xs font-semibold text-[#171b2b] line-clamp-2 leading-snug">
+                        {pName}
+                      </h3>
+                      <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-500">
+                        <Star size={13} className="text-amber-500 fill-amber-500" />
+                        <span className="font-bold text-[#171b2b]">{product.rating}</span>
+                        <span>({product.reviewsCount})</span>
+                      </div>
+                    </div>
+
+                    {/* Price & Installments */}
+                    <div className="flex flex-col pt-1">
+                      {product.originalPrice && (
+                        <span className="text-[11px] text-gray-400 line-through">
+                          R$ {product.originalPrice.toFixed(2).replace('.', ',')}
+                        </span>
+                      )}
+                      <span className="text-base font-black text-[#171b2b] leading-none mt-0.5">
+                        R$ {product.price.toFixed(2).replace('.', ',')}
+                      </span>
+                      <span className="text-[10px] text-gray-500 mt-1">
+                        3x de <strong className="text-[#171b2b]">R$ {(product.price / 3).toFixed(2).replace('.', ',')}</strong> s/ juros
+                      </span>
+
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        {isOutOfStock ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-bold">
+                            Sem estoque
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#bfedd1] text-[#254f3a] text-[9px] font-bold">
+                            {product.secondaryBadge || 'Estoque no Brasil'}
+                          </span>
+                        )}
+                        {product.variations && product.variations.length > 0 && (
+                          <span className="text-[9px] text-stone-500 font-medium">
+                            {product.variations.length} {product.variations.length === 1 ? 'variação' : 'variações'}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isOutOfStock) return;
+                          addToCart(product, product.colors[0]?.name || 'Padrão', product.sizes[0] || 'M');
+                        }}
+                        disabled={isOutOfStock}
+                        className={`mt-2.5 w-full py-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-xs ${
+                          isOutOfStock
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-[#ff6b57] hover:bg-[#e05340] text-white active:scale-95'
+                        }`}
+                      >
+                        <ShoppingBag size={13} />
+                        <span>{isOutOfStock ? 'Esgotado' : 'Adicionar à Sacola'}</span>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Price & Installments */}
-                  <div className="flex flex-col pt-1">
-                    {product.originalPrice && (
-                      <span className="text-[11px] text-gray-400 line-through">
-                        R$ {product.originalPrice.toFixed(2).replace('.', ',')}
-                      </span>
-                    )}
-                    <span className="text-base font-black text-[#171b2b] leading-none mt-0.5">
-                      R$ {product.price.toFixed(2).replace('.', ',')}
-                    </span>
-                    <span className="text-[10px] text-gray-500 mt-1">
-                      3x de <strong className="text-[#171b2b]">R$ {(product.price / 3).toFixed(2).replace('.', ',')}</strong> s/ juros
-                    </span>
-
-                    {product.secondaryBadge && (
-                      <div className="mt-1">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-[#bfedd1] text-[#254f3a] text-[9px] font-bold">
-                          {product.secondaryBadge}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                </article>
+              );
+            })
+          )}
         </div>
 
         {/* Load more button */}

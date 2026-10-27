@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { VirtualFittingModal } from './VirtualFittingModal';
 import { SizeGuideModal } from './SizeGuideModal';
+import { getProductById } from '../services/apiClient';
 
 interface ProductDetailScreenProps {
   product: Product;
@@ -17,33 +18,85 @@ interface ProductDetailScreenProps {
 export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ product, onBack }) => {
   const { addToCart, toggleFavorite, isFavorite, setCurrentTab, setIsCheckoutOpen, openSubScreen, closeProductDetail } = useCart();
 
+  const [detailedProduct, setDetailedProduct] = useState<Product>(product);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [selectedColor, setSelectedColor] = useState(product.colors[0]?.name || 'Rosê Floral');
-  const [selectedSize, setSelectedSize] = useState(product.sizes[1] || 'M');
+  const [selectedColor, setSelectedColor] = useState(product.colors[0]?.name || 'Padrão');
+  const [selectedSize, setSelectedSize] = useState(product.sizes[0] || 'M');
   const [quantity, setQuantity] = useState(1);
   const [isVirtualFittingOpen, setIsVirtualFittingOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+
+  // Buscar dados atualizados do ERP via getProductById(id)
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadProduct() {
+      if (!product.id) return;
+      setIsLoadingDetail(true);
+      try {
+        const fresh = await getProductById(product.id);
+        if (fresh && isMounted) {
+          setDetailedProduct(fresh);
+          if (fresh.colors && fresh.colors.length > 0 && !fresh.colors.some(c => c.name === selectedColor)) {
+            setSelectedColor(fresh.colors[0].name);
+          }
+          if (fresh.sizes && fresh.sizes.length > 0 && !fresh.sizes.includes(selectedSize)) {
+            setSelectedSize(fresh.sizes[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('[ProductDetailScreen] Não foi possível atualizar detalhes do ERP:', err);
+      } finally {
+        if (isMounted) setIsLoadingDetail(false);
+      }
+    }
+    loadProduct();
+    return () => { isMounted = false; };
+  }, [product.id]);
+
+  // Variação ativa selecionada (Tamanho + Cor)
+  const activeVariation = React.useMemo(() => {
+    const vars = detailedProduct.variations || [];
+    if (vars.length === 0) return null;
+
+    return vars.find(
+      v => v.size?.toLowerCase() === selectedSize?.toLowerCase() &&
+           v.color?.toLowerCase() === selectedColor?.toLowerCase()
+    ) || vars.find(v => v.size?.toLowerCase() === selectedSize?.toLowerCase()) || vars[0];
+  }, [detailedProduct.variations, selectedSize, selectedColor]);
+
+  // Preço e estoque dinâmicos da variação
+  const activePrice = activeVariation?.price ?? detailedProduct.price ?? 0;
+  const activeStock = activeVariation?.stock ?? detailedProduct.stock ?? 0;
+  const activeSku = activeVariation?.sku || detailedProduct.masterSku || detailedProduct.id;
+  const activeVarId = activeVariation?.id;
+  const isOutOfStock = activeStock <= 0;
 
   // Accordion toggle states
   const [isDescOpen, setIsDescOpen] = useState(true);
   const [isFabricOpen, setIsFabricOpen] = useState(false);
   const [isReviewsOpen, setIsReviewsOpen] = useState(false);
 
-  const favorited = isFavorite(product.id);
+  const favorited = isFavorite(detailedProduct.id);
 
   const handleAddToCart = () => {
-    addToCart(product, selectedColor, selectedSize, quantity);
+    if (isOutOfStock) return;
+    addToCart(detailedProduct, selectedColor, selectedSize, quantity, activeSku, activeVarId);
   };
 
   const handleBuyNow = () => {
-    addToCart(product, selectedColor, selectedSize, quantity);
+    if (isOutOfStock) return;
+    addToCart(detailedProduct, selectedColor, selectedSize, quantity, activeSku, activeVarId);
     closeProductDetail();
     openSubScreen('payment-checkout');
   };
 
-  const galleryImages = product.images.length > 0 ? product.images : [
-    'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80'
-  ];
+  const galleryImages = (detailedProduct.images && detailedProduct.images.length > 0)
+    ? detailedProduct.images
+    : (detailedProduct.coverImageUrl ? [detailedProduct.coverImageUrl] : [
+        'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80'
+      ]);
 
   return (
     <div className="flex flex-col w-full pb-32 text-[#171b2b] bg-[#FAF9F6]">
@@ -212,23 +265,28 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
 
         {/* Title */}
         <h2 className="text-xl sm:text-2xl font-black text-[#171b2b] tracking-tight leading-snug">
-          {product.name}
+          {detailedProduct.title || detailedProduct.name}
         </h2>
 
         {/* Pricing & Installments */}
         <div className="flex flex-col">
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-black text-[#ff6b57]">
-              R$ {product.price.toFixed(2).replace('.', ',')}
+              R$ {activePrice.toFixed(2).replace('.', ',')}
             </span>
-            {product.originalPrice && (
+            {detailedProduct.originalPrice && (
               <span className="text-sm text-gray-400 line-through">
-                R$ {product.originalPrice.toFixed(2).replace('.', ',')}
+                R$ {detailedProduct.originalPrice.toFixed(2).replace('.', ',')}
+              </span>
+            )}
+            {activeVariation && (
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                SKU: {activeVariation.sku}
               </span>
             )}
           </div>
           <span className="text-xs text-gray-500 mt-0.5">
-            ou até 3x de <strong className="text-[#171b2b]">R$ {(product.price / 3).toFixed(2).replace('.', ',')}</strong> sem juros
+            ou até 3x de <strong className="text-[#171b2b]">R$ {(activePrice / 3).toFixed(2).replace('.', ',')}</strong> sem juros
           </span>
         </div>
 
@@ -242,7 +300,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
               Promoção Ativa: Leve 3 peças por R$ 100
             </span>
             <span className="text-[11px] text-gray-600">
-              Economize adicionando mais itens da categoria infantil!
+              Economize adicionando mais peças da SAGAS!
             </span>
           </div>
         </div>
@@ -253,11 +311,11 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
             <span className="font-bold text-gray-800">
               Cor: <strong className="text-[#171b2b]">{selectedColor}</strong>
             </span>
-            <span className="text-gray-500">{product.colors.length} opções</span>
+            <span className="text-gray-500">{detailedProduct.colors.length} opções</span>
           </div>
 
           <div className="flex items-center gap-3">
-            {product.colors.map(col => (
+            {detailedProduct.colors.map(col => (
               <button
                 key={col.name}
                 onClick={() => setSelectedColor(col.name)}
@@ -288,7 +346,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
           </div>
 
           <div className="grid grid-cols-4 gap-2">
-            {product.sizes.map(size => (
+            {detailedProduct.sizes.map(size => (
               <button
                 key={size}
                 onClick={() => setSelectedSize(size)}
@@ -304,24 +362,34 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
           </div>
         </div>
 
-        {/* Quantity Stepper */}
+        {/* Quantity Stepper & Stock */}
         <div className="space-y-1.5 pt-1">
           <div className="flex justify-between items-center text-xs">
             <span className="font-bold text-gray-800">Quantidade</span>
-            <span className="text-[11px] text-emerald-700 font-bold">Estoque disponível no Brasil</span>
+            {isOutOfStock ? (
+              <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                Esgotado nesta variação
+              </span>
+            ) : (
+              <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                ✓ {activeStock} em estoque no Brasil
+              </span>
+            )}
           </div>
 
           <div className="flex items-center justify-between bg-white border border-[#EAE6DF] rounded-2xl p-1.5 w-32 shadow-xs">
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 font-bold transition-colors"
+              disabled={isOutOfStock}
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center text-gray-700 font-bold transition-colors"
             >
               <Minus size={14} />
             </button>
             <span className="font-black text-sm text-[#171b2b]">{quantity}</span>
             <button
-              onClick={() => setQuantity(quantity + 1)}
-              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 font-bold transition-colors"
+              onClick={() => setQuantity(Math.min(activeStock || 99, quantity + 1))}
+              disabled={isOutOfStock || quantity >= activeStock}
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-40 flex items-center justify-center text-gray-700 font-bold transition-colors"
             >
               <Plus size={14} />
             </button>
@@ -499,18 +567,28 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
           <div className="hidden lg:flex items-center gap-3 pt-3">
             <button
               onClick={handleAddToCart}
-              className="flex-1 py-3.5 px-4 rounded-full border-2 border-[#ff6b57] text-[#ff6b57] font-bold text-xs hover:bg-[#ff6b57]/5 active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-xs"
+              disabled={isOutOfStock}
+              className={`flex-1 py-3.5 px-4 rounded-full border-2 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs ${
+                isOutOfStock
+                  ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'border-[#ff6b57] text-[#ff6b57] hover:bg-[#ff6b57]/5 active:scale-95'
+              }`}
             >
               <ShoppingBag size={18} />
-              <span>Adicionar ao Carrinho</span>
+              <span>{isOutOfStock ? 'Esgotado' : 'Adicionar ao Carrinho'}</span>
             </button>
 
             <button
               onClick={handleBuyNow}
-              className="flex-1 py-3.5 px-4 rounded-full bg-[#ff6b57] hover:bg-[#ff5745] text-white font-extrabold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              disabled={isOutOfStock}
+              className={`flex-1 py-3.5 px-4 rounded-full font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                isOutOfStock
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-[#ff6b57] hover:bg-[#ff5745] text-white active:scale-95'
+              }`}
             >
               <Lock size={16} />
-              <span>Comprar Agora</span>
+              <span>{isOutOfStock ? 'Indisponível' : 'Comprar Agora'}</span>
             </button>
           </div>
         </div>
@@ -521,18 +599,28 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
         <div className="flex items-center gap-3">
           <button
             onClick={handleAddToCart}
-            className="flex-1 py-3 px-3 rounded-full border-2 border-[#ff6b57] text-[#ff6b57] font-bold text-xs hover:bg-[#ff6b57]/5 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+            disabled={isOutOfStock}
+            className={`flex-1 py-3 px-3 rounded-full border-2 font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+              isOutOfStock
+                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'border-[#ff6b57] text-[#ff6b57] hover:bg-[#ff6b57]/5 active:scale-95'
+            }`}
           >
             <ShoppingBag size={16} />
-            <span>Adicionar ao Carrinho</span>
+            <span>{isOutOfStock ? 'Esgotado' : 'Adicionar ao Carrinho'}</span>
           </button>
 
           <button
             onClick={handleBuyNow}
-            className="flex-1 py-3 px-3 rounded-full bg-[#ff6b57] hover:bg-[#ff5745] text-white font-extrabold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+            disabled={isOutOfStock}
+            className={`flex-1 py-3 px-3 rounded-full font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 ${
+              isOutOfStock
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-[#ff6b57] hover:bg-[#ff5745] text-white active:scale-95'
+            }`}
           >
             <Lock size={15} />
-            <span>Comprar Agora</span>
+            <span>{isOutOfStock ? 'Indisponível' : 'Comprar Agora'}</span>
           </button>
         </div>
       </div>
