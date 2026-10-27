@@ -98,7 +98,7 @@ const MainAppContent: React.FC = () => {
       <Header />
 
       {/* Main Store Viewport (Fully Responsive without mobile phone shells) */}
-      <main className="flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-16 py-3 sm:py-6">
+      <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-3 sm:py-6">
         {renderActiveScreen()}
       </main>
 

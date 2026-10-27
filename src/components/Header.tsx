@@ -56,7 +56,7 @@ export const Header: React.FC = () => {
     <>
       {/* Top Announcement Strip */}
       <div className="w-full bg-[#171B2B] text-white text-[11px] font-medium py-1.5 px-4 flex items-center justify-between">
-        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-16 flex items-center justify-between">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B57] animate-pulse"></span>
             <span className="hidden sm:inline text-gray-300">Frete Grátis acima de R$ 149</span>
@@ -87,7 +87,7 @@ export const Header: React.FC = () => {
 
       {/* Main Responsive Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#EAE6DF] shadow-xs">
-        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-16 h-16 flex items-center justify-between gap-3">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 h-16 flex items-center justify-between gap-3">
           
           {/* Left: Mobile Hamburger & Brand Logo */}
           <div className="flex items-center gap-3">

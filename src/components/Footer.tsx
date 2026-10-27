@@ -7,7 +7,7 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="w-full bg-[#171B2B] text-white pt-12 pb-24 md:pb-12 border-t border-gray-800 mt-auto">
-      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-16">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
         
         {/* Trust Badges Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-10 border-b border-gray-800 text-xs">

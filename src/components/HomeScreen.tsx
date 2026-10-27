@@ -209,7 +209,7 @@ export const HomeScreen: React.FC = () => {
         <>
           {/* 2. Chips de Categorias com Rolagem Horizontal Suave */}
           <section className="w-full pt-3 pb-2 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-2 px-4 w-max">
+            <div className="flex items-center gap-2 px-0 w-max">
               {/* Chip Novidades */}
               <button
                 onClick={() => setActiveCategoryChip('novidades')}
@@ -329,9 +329,9 @@ export const HomeScreen: React.FC = () => {
       </section>
 
       {/* 4. Seção Ofertas Relâmpago (Flash Sale) */}
-      <section className="mt-4 py-3 bg-white shadow-xs border-y border-[#EAE6DF]/70 flex flex-col gap-3">
+      <section className="mt-4 py-3 bg-white shadow-xs rounded-2xl border border-[#EAE6DF]/70 flex flex-col gap-3 w-full">
         {/* Header with Title, Timer and Link */}
-        <div className="px-4 flex items-center justify-between">
+        <div className="px-3 sm:px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-base sm:text-lg font-black text-[#171b2b]">Ofertas Relâmpago</span>
@@ -382,7 +382,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* Scroll Horizontal de Produtos Relâmpago */}
         <div className="w-full overflow-x-auto no-scrollbar">
-          <div className="flex items-stretch gap-3 px-4 w-max pb-1">
+          <div className="flex items-stretch gap-3 px-3 sm:px-4 w-max pb-1">
             {isLoadingProducts ? (
               [...Array(4)].map((_, i) => (
                 <div key={i} className="w-36 sm:w-44 flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">
@@ -472,7 +472,7 @@ export const HomeScreen: React.FC = () => {
       </section>
 
       {/* 5. Tiles Promocionais em 2 Colunas */}
-      <section className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      <section className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full">
         {/* Tile Feminino */}
         <div
           onClick={() => setCurrentTab('categorias')}
@@ -514,8 +514,8 @@ export const HomeScreen: React.FC = () => {
         </div>
       </section>
 
-      {/* 6. Grade de Produtos "Mais Vendidos" (Responsivo: 2 a 5 colunas) */}
-      <section className="mt-8 flex flex-col gap-4">
+      {/* 6. Grade de Produtos "Mais Vendidos" (Responsivo: 2 a 6 colunas) */}
+      <section className="mt-8 flex flex-col gap-4 w-full">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <h2 className="text-lg sm:text-xl font-black text-[#171b2b]">Mais Vendidos</h2>
