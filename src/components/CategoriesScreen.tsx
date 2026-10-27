@@ -202,7 +202,7 @@ export const CategoriesScreen: React.FC = () => {
       </div>
 
       {/* Responsive Product Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5 px-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 px-0 sm:px-2 w-full">
         {isLoadingProducts ? (
           [...Array(6)].map((_, i) => (
             <div key={i} className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">

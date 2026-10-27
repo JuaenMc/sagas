@@ -164,9 +164,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
       </div>
 
       {/* Responsive 2-Column Product Detail Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start mb-6 w-full">
         {/* Left: Gallery Column */}
-        <div className="lg:col-span-6 flex flex-col">
+        <div className="w-full flex flex-col">
           <div className="relative w-full aspect-[3/4] rounded-[28px] overflow-hidden bg-gray-100 shadow-md border border-[#EAE6DF]">
           <img
             src={galleryImages[currentImageIndex] || galleryImages[0]}
@@ -250,7 +250,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
       </div>
 
       {/* Right: Product Vital Information Column */}
-      <div className="lg:col-span-6 flex flex-col gap-4">
+      <div className="w-full flex flex-col gap-4">
         {/* Collection & Rating */}
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-extrabold text-[#3d6751] uppercase tracking-wider">

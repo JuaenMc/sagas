@@ -109,7 +109,7 @@ export const HomeScreen: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5 mt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 mt-2 w-full">
               {searchFilteredProducts.map((product) => {
                 const favorited = isFavorite(product.id);
                 const displayImg = product.coverImageUrl || (product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
@@ -278,10 +278,10 @@ export const HomeScreen: React.FC = () => {
       </section>
 
       {/* 3. Hero Banner Carrossel (Inspiração Lifestyle Boutique) */}
-      <section className="pt-2 pb-1">
+      <section className="pt-2 pb-1 w-full">
         <div
           onClick={() => setCurrentTab('categorias')}
-          className="cursor-pointer relative w-full rounded-[24px] overflow-hidden shadow-md aspect-[16/10] sm:aspect-[21/9] lg:aspect-[24/9] min-h-[260px] sm:min-h-[360px] bg-[#171b2b] flex flex-col justify-end p-5 sm:p-8 lg:p-10 group"
+          className="cursor-pointer relative w-full rounded-[24px] overflow-hidden shadow-md aspect-[16/10] sm:aspect-[21/9] lg:aspect-[24/9] min-h-[280px] sm:min-h-[380px] lg:min-h-[440px] bg-[#171b2b] flex flex-col justify-end p-5 sm:p-8 lg:p-12 group"
         >
           {/* Background image from HTML snippet */}
           <img
@@ -525,7 +525,7 @@ export const HomeScreen: React.FC = () => {
         </div>
 
         {/* Grid Responsivo com Skeleton Loading */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 w-full">
           {isLoadingProducts ? (
             [...Array(6)].map((_, i) => (
               <div key={i} className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">
