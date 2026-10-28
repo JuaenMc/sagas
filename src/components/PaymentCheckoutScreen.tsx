@@ -101,28 +101,68 @@ export const PaymentCheckoutScreen: React.FC<PaymentCheckoutScreenProps> = ({ on
       const pMethod = selectedPayment === 'pix' ? 'PIX' : selectedPayment === 'credit_card' ? 'CREDIT_CARD' : 'BOLETO';
       
       if (!orderId) {
-        showToast('Reservando estoque no ERP...');
+        showToast('Criando pedido no ERP...');
         const createRes = await createCheckoutOrder(pMethod);
         if (createRes && (createRes.orderId || createRes.orderNumber)) {
           orderId = createRes.orderId;
           orderNumber = createRes.orderNumber;
-
-          // Se a API retornar link de checkout externo (Mercado Pago / Gateway)
-          const paymentUrl = createRes.paymentUrl || createRes.initPoint || createRes.checkoutUrl;
-          if (paymentUrl && typeof paymentUrl === 'string' && paymentUrl.startsWith('http')) {
-            clearCart();
-            window.location.href = paymentUrl;
-            return;
-          }
         } else {
           setIsProcessing(false);
           return;
         }
       }
 
+      // Se o usuário selecionou Mercado Pago Checkout Pro ou Cartão
+      if (selectedPayment === 'credit_card' || selectedPayment === 'boleto') {
+        try {
+          showToast('Conectando ao gateway Mercado Pago...');
+          const mpPref = await apiClient.createMercadoPagoPreference({
+            orderId: orderId!,
+            items: cart.map(it => ({
+              id: it.productId,
+              title: it.name,
+              quantity: it.quantity,
+              unitPrice: it.price
+            })),
+            payer: {
+              name: currentUser?.displayName || firebaseAuthUser?.displayName || 'Cliente SAGAS',
+              email: currentUser?.email || firebaseAuthUser?.email || 'cliente@sagas.moda'
+            }
+          });
+
+          if (mpPref && (mpPref.initPoint || mpPref.sandboxInitPoint)) {
+            clearCart();
+            window.location.href = mpPref.initPoint || mpPref.sandboxInitPoint;
+            return;
+          }
+        } catch (mpErr: any) {
+          console.warn('[PaymentCheckout] Falha ao gerar preferência Mercado Pago:', mpErr);
+        }
+      }
+
+      // Se for Pix, podemos gerar via Mercado Pago ou validar no ERP
+      if (selectedPayment === 'pix') {
+        try {
+          const pixRes = await apiClient.createMercadoPagoPix({
+            orderId: orderId!,
+            amount: activeTotal,
+            payer: {
+              email: currentUser?.email || firebaseAuthUser?.email || 'cliente@sagas.moda',
+              name: currentUser?.displayName || firebaseAuthUser?.displayName || 'Cliente SAGAS'
+            }
+          });
+          if (pixRes && pixRes.qrCode) {
+            // Pix dinâmico do Mercado Pago
+            console.info('[PaymentCheckout] Pix dinâmico gerado:', pixRes.id);
+          }
+        } catch (pixErr) {
+          console.warn('[PaymentCheckout] Usando Pix direto com chave SAGAS:', pixErr);
+        }
+      }
+
       // 2. Confirmar pagamento no ERP (baixa definitiva de estoque e status: PAID)
-      showToast('Confirmando pagamento no ERP...');
-      const externalPaymentId = `pay-${Date.now()}`;
+      showToast('Confirmando pedido e reservando peças no ERP...');
+      const externalPaymentId = `mp-${Date.now()}`;
       await confirmOrderPayment({
         externalPaymentId,
         paidAt: new Date().toISOString()

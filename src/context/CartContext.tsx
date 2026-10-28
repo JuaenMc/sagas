@@ -5,6 +5,7 @@ import { auth, googleProvider, db, handleFirestoreError, OperationType } from '.
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
 import { erpClient } from '../services/erpClient';
+import apiClient from '../services/apiClient';
 
 interface CartContextType {
   cart: CartItem[];
@@ -16,7 +17,7 @@ interface CartContextType {
   // Coupon
   appliedCoupon: string | null;
   couponDiscountAmount: number;
-  applyCoupon: (code: string) => boolean;
+  applyCoupon: (code: string) => Promise<boolean> | boolean;
   removeCoupon: () => void;
 
   // Totals & Combo
@@ -82,6 +83,9 @@ interface CartContextType {
   firebaseAuthUser: User | null;
   isAuthLoading: boolean;
   loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  registerWithEmail: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+  calculateShippingForCep: (cep: string) => Promise<any>;
   logoutUser: () => Promise<void>;
 
   // Saved Cards
@@ -183,15 +187,23 @@ const DEFAULT_ADDRESSES: DeliveryAddress[] = [
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cart, setCart] = useState<CartItem[]>(INITIAL_CART_ITEMS);
-  const [favorites, setFavorites] = useState<string[]>([
-    'prod-vestido-floral',
-    'prod-macaquinho-jeans',
-    'prod-safari-shorts',
-    'prod-blusa-tricot-modal',
-    'prod-jardineira-linho'
-  ]);
-  const [appliedCoupon, setAppliedCoupon] = useState<string | null>('BEMVINDA10');
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sagas_cart');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sagas_favorites');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [couponDiscountAmount, setCouponDiscountAmount] = useState<number>(0);
+  const [shippingCost, setShippingCost] = useState<number>(0);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('pix');
   const [currentTab, setCurrentTab] = useState<ScreenTab>('home');
   const [subScreen, setSubScreen] = useState<SubScreen>('none');
@@ -205,15 +217,33 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentOrderNumber, setCurrentOrderNumber] = useState<string | null>(null);
   const [currentExternalId, setCurrentExternalId] = useState<string | null>(null);
 
-  // Authentication State
+  // Authentication State (sem dados mockados, com sessão persistente via localStorage e JWT)
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<User | null>(null);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(DEFAULT_PROFILE);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('sagas_user');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [savedCards, setSavedCards] = useState<SavedCardItem[]>(DEFAULT_SAVED_CARDS);
+  const [savedCards, setSavedCards] = useState<SavedCardItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sagas_saved_cards');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
 
-  // Delivery Addresses State (Firestore + ViaCEP)
-  const [addresses, setAddresses] = useState<DeliveryAddress[]>(DEFAULT_ADDRESSES);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>('addr-default-1');
+  // Delivery Addresses State (Neon DB + localStorage)
+  const [addresses, setAddresses] = useState<DeliveryAddress[]>(() => {
+    try {
+      const saved = localStorage.getItem('sagas_addresses');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
   // Dynamic Products Catalog (ERP Sincronizado + Fallback Local)
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
@@ -250,66 +280,55 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return addresses.find(a => a.id === selectedAddressId) || addresses.find(a => a.isDefault) || addresses[0] || null;
   }, [addresses, selectedAddressId]);
 
-  // Listen to Firebase Auth
+
+  // Listen to Firebase Auth or local token
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseAuthUser(user);
       if (user) {
         // Authenticated with Google / Firebase
-        const userRef = doc(db, 'users', user.uid);
+        const userProfile: UserProfile = {
+          uid: user.uid,
+          displayName: user.displayName || 'Cliente SAGAS',
+          email: user.email || '',
+          photoURL: user.photoURL || undefined,
+          isVip: true,
+          cashback: 45.0,
+          activeOrdersCount: 0,
+          couponsCount: 2
+        };
+        setCurrentUser(userProfile);
         try {
-          const snap = await getDoc(userRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            setCurrentUser({
-              uid: user.uid,
-              displayName: user.displayName || data.name || 'Cliente SAGAS',
-              email: user.email,
-              photoURL: user.photoURL || data.photoURL,
-              isVip: true,
-              cashback: data.cashbackBalance ?? 45.0,
-              activeOrdersCount: 4,
-              couponsCount: 2
-            });
-          } else {
-            // First time Google Sign In - persist to Firestore
-            const newProfile: UserProfile = {
-              uid: user.uid,
-              displayName: user.displayName || 'Cliente SAGAS',
-              email: user.email,
-              photoURL: user.photoURL,
-              isVip: true,
-              cashback: 45.0,
-              activeOrdersCount: 4,
-              couponsCount: 2
-            };
-            await setDoc(userRef, {
-              userId: user.uid,
-              name: user.displayName || 'Cliente SAGAS',
-              email: user.email,
-              photoURL: user.photoURL || '',
-              vipLevel: 'Cliente VIP Ouro',
-              cashbackBalance: 45.0,
-              createdAt: new Date().toISOString()
-            });
-            setCurrentUser(newProfile);
-          }
-        } catch (err) {
-          console.warn('Firestore user fetch notice:', err);
-          setCurrentUser({
-            uid: user.uid,
-            displayName: user.displayName || 'Cliente SAGAS',
-            email: user.email,
-            photoURL: user.photoURL,
-            isVip: true,
-            cashback: 45.0,
-            activeOrdersCount: 4,
-            couponsCount: 2
-          });
-        }
+          localStorage.setItem('sagas_user', JSON.stringify(userProfile));
+        } catch {}
       } else {
-        // Fallback default demo profile (Mariana Siqueira)
-        setCurrentUser(DEFAULT_PROFILE);
+        // Verify if we have a valid JWT session in localStorage
+        const storedToken = localStorage.getItem('sagas_auth_token');
+        if (storedToken) {
+          apiClient.getMe()
+            .then(profile => {
+              if (profile && profile.user) {
+                const u = profile.user;
+                const p: UserProfile = {
+                  uid: u.id,
+                  displayName: u.name,
+                  email: u.email,
+                  isVip: true,
+                  cashback: 45.0,
+                  activeOrdersCount: 0,
+                  couponsCount: 2
+                };
+                setCurrentUser(p);
+                localStorage.setItem('sagas_user', JSON.stringify(p));
+              }
+            })
+            .catch(() => {
+              // expired or invalid
+              localStorage.removeItem('sagas_auth_token');
+              localStorage.removeItem('sagas_user');
+              setCurrentUser(null);
+            });
+        }
       }
       setIsAuthLoading(false);
     });
@@ -317,55 +336,73 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  // Listen for Saved Cards when authenticated
+  // Sync cart with database when user is authenticated
   useEffect(() => {
-    if (!firebaseAuthUser) return;
-    const cardsPath = `users/${firebaseAuthUser.uid}/savedCards`;
-    const unsubscribe = onSnapshot(
-      collection(db, 'users', firebaseAuthUser.uid, 'savedCards'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const loaded: SavedCardItem[] = snapshot.docs.map(d => ({
-            id: d.id,
-            ...(d.data() as any)
+    if (!currentUser) return;
+    apiClient.getCart()
+      .then(items => {
+        if (items && items.length > 0) {
+          const mapped: CartItem[] = items.map((it: any) => ({
+            id: it.id,
+            productId: it.productId,
+            name: it.product?.title || it.product?.name || 'Peça SAGAS',
+            image: it.product?.coverImageUrl || 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80',
+            price: it.product?.price || 49.9,
+            quantity: it.quantity,
+            selectedColor: it.variation?.color || 'Padrão',
+            selectedSize: it.variation?.size || 'M',
+            variationId: it.variationId,
+            variationSku: it.variation?.sku
           }));
-          setSavedCards(loaded);
+          setCart(mapped);
+          try {
+            localStorage.setItem('sagas_cart', JSON.stringify(mapped));
+          } catch {}
         }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, cardsPath);
-      }
-    );
-    return () => unsubscribe();
-  }, [firebaseAuthUser]);
+      })
+      .catch(err => console.warn('[CartContext] Erro ao carregar carrinho do Neon DB:', err));
 
-  // Listen for Delivery Addresses in Firestore when authenticated
-  useEffect(() => {
-    if (!firebaseAuthUser) return;
-    const addressesPath = `users/${firebaseAuthUser.uid}/addresses`;
-    const unsubscribe = onSnapshot(
-      collection(db, 'users', firebaseAuthUser.uid, 'addresses'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const loaded: DeliveryAddress[] = snapshot.docs.map(d => ({
-            id: d.id,
-            ...(d.data() as any)
-          }));
-          setAddresses(loaded);
-          const defaultItem = loaded.find(a => a.isDefault);
-          if (defaultItem) {
-            setSelectedAddressId(defaultItem.id);
-          } else if (loaded.length > 0) {
-            setSelectedAddressId(loaded[0].id);
-          }
+    // Carregar favoritos do Neon DB
+    apiClient.getFavorites()
+      .then(favs => {
+        if (Array.isArray(favs)) {
+          const ids = favs.map((f: any) => f.productId || f.id || f);
+          setFavorites(ids);
+          try {
+            localStorage.setItem('sagas_favorites', JSON.stringify(ids));
+          } catch {}
         }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, addressesPath);
-      }
-    );
-    return () => unsubscribe();
-  }, [firebaseAuthUser]);
+      })
+      .catch(err => console.warn('[CartContext] Erro ao carregar favoritos do Neon DB:', err));
+
+    // Carregar endereços do Neon DB
+    apiClient.getAddresses()
+      .then(addrList => {
+        if (Array.isArray(addrList) && addrList.length > 0) {
+          setAddresses(addrList);
+          const def = addrList.find((a: any) => a.isDefault) || addrList[0];
+          setSelectedAddressId(def.id);
+          try {
+            localStorage.setItem('sagas_addresses', JSON.stringify(addrList));
+          } catch {}
+        }
+      })
+      .catch(err => console.warn('[CartContext] Erro ao carregar endereços do Neon DB:', err));
+  }, [currentUser?.uid]);
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sagas_cart', JSON.stringify(cart));
+    } catch {}
+  }, [cart]);
+
+  // Persist favorites to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sagas_favorites', JSON.stringify(favorites));
+    } catch {}
+  }, [favorites]);
 
   // Sincronização do catálogo com o ERP Backend (com fallback offline)
   const fetchProductsFromERP = async () => {
@@ -399,7 +436,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      showToast(`Bem-vinda(o), ${result.user.displayName || 'Cliente'}!`);
+      const user = result.user;
+      const profile: UserProfile = {
+        uid: user.uid,
+        displayName: user.displayName || 'Cliente SAGAS',
+        email: user.email || '',
+        photoURL: user.photoURL || undefined,
+        isVip: true,
+        cashback: 45.0,
+        activeOrdersCount: 0,
+        couponsCount: 2
+      };
+      setCurrentUser(profile);
+      localStorage.setItem('sagas_user', JSON.stringify(profile));
+      showToast(`Bem-vinda(o), ${user.displayName || 'Cliente'}!`);
       setSubScreen('none');
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
@@ -407,14 +457,82 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithEmail = async (email: string, pass: string) => {
+    try {
+      const res = await apiClient.loginUser(email, pass);
+      if (res && res.user) {
+        const u = res.user;
+        const profile: UserProfile = {
+          uid: u.id,
+          displayName: u.name,
+          email: u.email,
+          isVip: true,
+          cashback: 45.0,
+          activeOrdersCount: 0,
+          couponsCount: 2
+        };
+        setCurrentUser(profile);
+        localStorage.setItem('sagas_user', JSON.stringify(profile));
+        showToast(`Bem-vinda de volta, ${u.name}!`);
+        setSubScreen('none');
+      }
+    } catch (err: any) {
+      console.error('[CartContext] Login error:', err);
+      showToast(err.message || 'Falha no login. Verifique seus dados.');
+      throw err;
+    }
+  };
+
+  const registerWithEmail = async (name: string, email: string, pass: string, phone?: string) => {
+    try {
+      const res = await apiClient.registerUser(name, email, pass, phone);
+      if (res && res.user) {
+        const u = res.user;
+        const profile: UserProfile = {
+          uid: u.id,
+          displayName: u.name,
+          email: u.email,
+          isVip: true,
+          cashback: 45.0,
+          activeOrdersCount: 0,
+          couponsCount: 2
+        };
+        setCurrentUser(profile);
+        localStorage.setItem('sagas_user', JSON.stringify(profile));
+        showToast(`Conta criada com sucesso! Bem-vinda, ${u.name}!`);
+        setSubScreen('none');
+      }
+    } catch (err: any) {
+      console.error('[CartContext] Register error:', err);
+      showToast(err.message || 'Falha ao criar conta. Tente outro e-mail.');
+      throw err;
+    }
+  };
+
+  const calculateShippingForCep = async (cep: string) => {
+    try {
+      const itemsCount = cart.reduce((acc, it) => acc + it.quantity, 0);
+      const res = await apiClient.calculateShipping(cep, subtotal, itemsCount);
+      if (res && res.options && res.options.length > 0) {
+        setShippingCost(res.options[0].cost);
+        return res;
+      }
+    } catch (err: any) {
+      console.warn('[CartContext] Calculate shipping error:', err);
+    }
+    return null;
+  };
+
   const logoutUser = async () => {
     try {
       await signOut(auth);
-      setCurrentUser(null);
-      showToast('Sessão encerrada com sucesso.');
     } catch (err) {
-      console.error('Logout error:', err);
+      // ignore
     }
+    apiClient.logoutLocal();
+    setCurrentUser(null);
+    setFirebaseAuthUser(null);
+    showToast('Sessão encerrada com sucesso.');
   };
 
   const saveCreditCard = async (newCardData: Omit<SavedCardItem, 'id'>) => {
@@ -648,11 +766,21 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCart([...cart, newItem]);
     }
     showToast(`"${displayName}" adicionado à sacola!`);
+
+    // Sincronizar com Neon PostgreSQL se logado
+    if (currentUser) {
+      apiClient.addCartItem(product.id, targetVarId || product.id, quantity)
+        .catch(err => console.warn('[CartContext] Falha ao persistir item no Neon DB:', err));
+    }
   };
 
   const removeFromCart = (cartItemId: string) => {
     setCart(cart.filter(item => item.id !== cartItemId));
     showToast('Item removido do carrinho');
+    if (currentUser) {
+      apiClient.removeCartItem(cartItemId)
+        .catch(err => console.warn('[CartContext] Falha ao remover item do Neon DB:', err));
+    }
   };
 
   const updateQuantity = (cartItemId: string, newQty: number) => {
@@ -661,11 +789,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     setCart(cart.map(item => (item.id === cartItemId ? { ...item, quantity: newQty } : item)));
+    if (currentUser) {
+      apiClient.updateCartItem(cartItemId, newQty)
+        .catch(err => console.warn('[CartContext] Falha ao atualizar quantidade no Neon DB:', err));
+    }
   };
 
   const clearCart = () => {
     setCart([]);
     showToast('Carrinho limpo');
+    if (currentUser) {
+      apiClient.clearCartDb()
+        .catch(err => console.warn('[CartContext] Falha ao limpar carrinho no Neon DB:', err));
+    }
   };
 
   /**
@@ -764,30 +900,56 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const toggleFavorite = (productId: string) => {
-    setFavorites(prev => {
-      const exists = prev.includes(productId);
-      const updated = exists ? prev.filter(id => id !== productId) : [...prev, productId];
-      showToast(exists ? 'Removido dos favoritos' : 'Salvo nos favoritos!');
-      return updated;
-    });
+  const toggleFavorite = async (productId: string) => {
+    const exists = favorites.includes(productId);
+    const updated = exists ? favorites.filter(id => id !== productId) : [...favorites, productId];
+    setFavorites(updated);
+    showToast(exists ? 'Removido dos favoritos' : 'Salvo nos favoritos!');
+    if (currentUser) {
+      try {
+        if (exists) {
+          await apiClient.removeFavorite(productId);
+        } else {
+          await apiClient.addFavorite(productId);
+        }
+      } catch (e) {
+        console.warn('[CartContext] Falha ao sincronizar favorito com banco:', e);
+      }
+    }
   };
 
   const isFavorite = (productId: string) => favorites.includes(productId);
 
-  const applyCoupon = (code: string) => {
+  const applyCoupon = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
-    if (cleanCode === 'BEMVINDA10' || cleanCode === 'BEMVINDA' || cleanCode === 'SAGAS10' || cleanCode === 'VERAO2025') {
-      setAppliedCoupon(cleanCode);
-      showToast(`Cupom ${cleanCode} aplicado com sucesso!`);
-      return true;
+    try {
+      const res = await apiClient.validateCoupon(cleanCode, subtotal);
+      if (res && res.valid) {
+        setAppliedCoupon(cleanCode);
+        setCouponDiscountAmount(res.discountAmount || 0);
+        showToast(`Cupom ${cleanCode} aplicado com sucesso! Desconto: R$ ${(res.discountAmount || 0).toFixed(2)}`);
+        return true;
+      } else {
+        showToast(res?.message || 'Cupom inválido ou requisitos não atendidos');
+        return false;
+      }
+    } catch (err: any) {
+      // Local fallback for offline/demo coupons
+      if (['BEMVINDA10', 'BEMVINDA', 'SAGAS15', 'VIP20'].includes(cleanCode)) {
+        setAppliedCoupon(cleanCode);
+        const disc = cleanCode.includes('15') ? 15 : cleanCode.includes('20') ? 20 : 10;
+        setCouponDiscountAmount(disc);
+        showToast(`Cupom ${cleanCode} aplicado!`);
+        return true;
+      }
+      showToast('Cupom inválido ou expirado');
+      return false;
     }
-    showToast('Cupom inválido ou expirado');
-    return false;
   };
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
+    setCouponDiscountAmount(0);
     showToast('Cupom removido');
   };
 
@@ -808,7 +970,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Calculations
-  const { subtotal, comboCount, comboItemsNeeded, comboDiscount, couponDiscountAmount, totalDiscount, total, pixTotal } = useMemo(() => {
+  const { subtotal, comboCount, comboItemsNeeded, comboDiscount, totalDiscount, total, pixTotal } = useMemo(() => {
     let sub = 0;
     let comboEligiblePieces = 0;
 
@@ -830,13 +992,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cDiscount = 14.82;
     }
 
-    let couponDiscount = 0;
-    if (appliedCoupon) {
-      couponDiscount = 14.98;
-    }
-
-    const tDiscount = cDiscount + couponDiscount;
-    const finalTotal = Math.max(0, sub - tDiscount);
+    const tDiscount = cDiscount + couponDiscountAmount;
+    const finalTotal = Math.max(0, sub - tDiscount + shippingCost);
     const pixVal = finalTotal * 0.95;
 
     return {
@@ -844,12 +1001,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       comboCount: comboEligiblePieces,
       comboItemsNeeded: itemsNeeded,
       comboDiscount: cDiscount,
-      couponDiscountAmount: couponDiscount,
       totalDiscount: tDiscount,
       total: finalTotal,
       pixTotal: pixVal
     };
-  }, [cart, appliedCoupon]);
+  }, [cart, couponDiscountAmount, shippingCost]);
 
   return (
     <CartContext.Provider

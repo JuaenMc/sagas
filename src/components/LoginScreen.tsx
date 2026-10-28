@@ -10,7 +10,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
-  const { loginWithGoogle, closeSubScreen, showToast, currentUser, firebaseAuthUser, logoutUser } = useCart();
+  const { loginWithGoogle, loginWithEmail, registerWithEmail, closeSubScreen, showToast, currentUser, firebaseAuthUser, logoutUser } = useCart();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [identifier, setIdentifier] = useState('');
@@ -19,19 +19,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier || !password) {
       showToast('Por favor, preencha todos os campos.');
       return;
     }
+    if (authMode === 'register' && !name) {
+      showToast('Por favor, informe seu nome completo.');
+      return;
+    }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      showToast(authMode === 'login' ? 'Login realizado com sucesso!' : 'Conta criada com sucesso!');
+    try {
+      if (authMode === 'login') {
+        await loginWithEmail(identifier, password);
+      } else {
+        await registerWithEmail(name, identifier, password);
+      }
       if (onBack) onBack();
       else closeSubScreen();
-    }, 700);
+    } catch (err: any) {
+      console.error('Auth error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

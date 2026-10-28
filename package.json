@@ -18,6 +18,7 @@
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@google/genai": "^2.4.0",
+    "@mercadopago/sdk-react": "^1.0.7",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^13.0.0",

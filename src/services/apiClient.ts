@@ -195,6 +195,7 @@ async function fetchWithRetry(url: string, options: RequestInit = {}): Promise<R
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('sagas_auth_token') : null;
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
@@ -202,6 +203,7 @@ async function fetchWithRetry(url: string, options: RequestInit = {}): Promise<R
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'X-ERP-API-KEY': API_KEY,
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
           ...(options.headers || {}),
         },
       });
@@ -411,6 +413,257 @@ export async function getOrderById(orderId: string): Promise<any | null> {
   }
 }
 
+// ============================================================================
+// 8. AUTENTICAÇÃO REAL (JWT + Neon DB)
+// ============================================================================
+
+export async function registerUser(payload: { email: string; password?: string; name: string; phone?: string; firebaseUid?: string }): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/auth/register`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Falha ao cadastrar usuário');
+  if (data.token && typeof localStorage !== 'undefined') {
+    localStorage.setItem('sagas_auth_token', data.token);
+  }
+  return data;
+}
+
+export async function loginUser(payload: { email: string; password?: string; firebaseUid?: string; name?: string }): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/auth/login`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Falha ao autenticar');
+  if (data.token && typeof localStorage !== 'undefined') {
+    localStorage.setItem('sagas_auth_token', data.token);
+  }
+  return data;
+}
+
+export async function getMe(): Promise<any | null> {
+  const currentBase = resolveBackendUrl();
+  try {
+    const res = await fetchWithRetry(`${currentBase}/api/auth/me`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user || null;
+  } catch {
+    return null;
+  }
+}
+
+export function logoutLocal() {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('sagas_auth_token');
+  }
+}
+
+// ============================================================================
+// 9. CARRINHO PERSISTENTE NO NEON DB
+// ============================================================================
+
+export async function getCart(): Promise<{ items: any[]; count: number; subtotal: number }> {
+  const currentBase = resolveBackendUrl();
+  try {
+    const res = await fetchWithRetry(`${currentBase}/api/cart`);
+    if (!res.ok) return { items: [], count: 0, subtotal: 0 };
+    const data = await res.json();
+    return {
+      items: data.data || [],
+      count: data.count || 0,
+      subtotal: data.subtotal || 0,
+    };
+  } catch {
+    return { items: [], count: 0, subtotal: 0 };
+  }
+}
+
+export async function addCartItem(payload: { productId: string; variationId?: string; quantity: number; size?: string; color?: string }): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/cart`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export async function updateCartItem(id: string, quantity: number): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/cart/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ quantity }),
+  });
+  return res.json();
+}
+
+export async function removeCartItem(id: string): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/cart/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
+export async function clearCartDb(): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/cart`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
+export async function syncCartItems(items: any[]): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/cart/sync`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+  return res.json();
+}
+
+// ============================================================================
+// 10. FAVORITOS / WISHLIST NO NEON DB
+// ============================================================================
+
+export async function getFavorites(): Promise<{ productIds: string[]; products: StoreProduct[] }> {
+  const currentBase = resolveBackendUrl();
+  try {
+    const res = await fetchWithRetry(`${currentBase}/api/favorites`);
+    if (!res.ok) return { productIds: [], products: [] };
+    const data = await res.json();
+    return {
+      productIds: data.productIds || [],
+      products: (data.data || []).map(mapErpProductToStoreProduct),
+    };
+  } catch {
+    return { productIds: [], products: [] };
+  }
+}
+
+export async function addFavorite(productId: string): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/favorites`, {
+    method: 'POST',
+    body: JSON.stringify({ productId }),
+  });
+  return res.json();
+}
+
+export async function removeFavorite(productId: string): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/favorites/${encodeURIComponent(productId)}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
+// ============================================================================
+// 11. ENDEREÇOS DE ENTREGA NO NEON DB
+// ============================================================================
+
+export async function getAddresses(): Promise<any[]> {
+  const currentBase = resolveBackendUrl();
+  try {
+    const res = await fetchWithRetry(`${currentBase}/api/addresses`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveAddress(addr: any): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const method = addr.id && !addr.id.startsWith('addr-temp') ? 'PUT' : 'POST';
+  const url = addr.id && !addr.id.startsWith('addr-temp')
+    ? `${currentBase}/api/addresses/${encodeURIComponent(addr.id)}`
+    : `${currentBase}/api/addresses`;
+
+  const res = await fetchWithRetry(url, {
+    method,
+    body: JSON.stringify(addr),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Falha ao salvar endereço');
+  return data.data || data;
+}
+
+export async function deleteAddress(id: string): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/addresses/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
+// ============================================================================
+// 12. CUPONS DE DESCONTO NO NEON DB
+// ============================================================================
+
+export async function validateCoupon(code: string, subtotal: number): Promise<{ valid: boolean; discountAmount: number; message?: string }> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/coupons/validate`, {
+    method: 'POST',
+    body: JSON.stringify({ code, subtotal }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Cupom inválido');
+  }
+  return {
+    valid: true,
+    discountAmount: data.coupon?.discountAmount || 0,
+    message: data.message,
+  };
+}
+
+// ============================================================================
+// 13. CÁLCULO DE FRETE REAL (CEP)
+// ============================================================================
+
+export async function calculateShipping(cep: string, subtotal = 0, weightGrams = 350): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/shipping/calculate`, {
+    method: 'POST',
+    body: JSON.stringify({ cep, subtotal, weightGrams }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Falha ao calcular frete');
+  return data;
+}
+
+// ============================================================================
+// 14. MERCADO PAGO GATEWAY REAL
+// ============================================================================
+
+export async function createMercadoPagoPreference(orderPayload: { items: any[]; payer: any; orderNumber: string }): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/payment/create-preference`, {
+    method: 'POST',
+    body: JSON.stringify(orderPayload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Falha ao gerar preferência Mercado Pago');
+  return data;
+}
+
+export async function createMercadoPagoPix(pixPayload: { amount: number; description?: string; payer: any; orderNumber: string }): Promise<any> {
+  const currentBase = resolveBackendUrl();
+  const res = await fetchWithRetry(`${currentBase}/api/payment/create-pix`, {
+    method: 'POST',
+    body: JSON.stringify(pixPayload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Falha ao gerar Pix Mercado Pago');
+  return data;
+}
+
 /**
  * Objeto cliente unificado
  */
@@ -422,6 +675,26 @@ export const apiClient = {
   cancelOrder,
   getOrders,
   getOrderById,
+  registerUser,
+  loginUser,
+  getMe,
+  logoutLocal,
+  getCart,
+  addCartItem,
+  updateCartItem,
+  removeCartItem,
+  clearCartDb,
+  syncCartItems,
+  getFavorites,
+  addFavorite,
+  removeFavorite,
+  getAddresses,
+  saveAddress,
+  deleteAddress,
+  validateCoupon,
+  calculateShipping,
+  createMercadoPagoPreference,
+  createMercadoPagoPix,
   mapErpProductToStoreProduct,
   resolveColorHex,
   resolveBackendUrl,

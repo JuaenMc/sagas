@@ -172,21 +172,24 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onBack }) => {
         return;
       }
 
-      // Fallback: se o ERP retornar vazio ou falhar, buscar histórico prévio no Firestore
-      console.info('[OrdersScreen] Buscando pedidos no Firestore como fallback...');
-      const { getDocs } = await import('firebase/firestore');
-      const snapshot = await getDocs(collection(db, 'users', userId, 'orders'));
-      if (!snapshot.empty) {
-        const legacy: Order[] = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-        setOrders(legacy);
-      } else {
-        setOrders(INITIAL_DEMO_ORDERS);
-      }
+      setOrders([]);
     } catch (err) {
-      console.warn('[OrdersScreen] Falha ao carregar pedidos do ERP, usando fallback:', err);
-      setOrders(INITIAL_DEMO_ORDERS);
+      console.warn('[OrdersScreen] Falha ao carregar pedidos do ERP:', err);
+      setOrders([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      showToast('Cancelando pedido...');
+      await erpClient.updateOrderStatus(orderId, 'CANCELLED');
+      showToast('Pedido cancelado com sucesso.');
+      loadOrders();
+    } catch (err: any) {
+      console.error('Cancel order error:', err);
+      showToast(err.message || 'Erro ao cancelar pedido.');
     }
   };
 
@@ -472,6 +475,15 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onBack }) => {
                       <Truck size={13} />
                       <span>Rastrear</span>
                     </button>
+                    {(order.status === 'em_preparacao' || (order as any).status === 'PENDING_PAYMENT') && (
+                      <button
+                        onClick={() => handleCancelOrder(order.id)}
+                        className="px-2.5 py-1.5 rounded-full bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition"
+                        title="Cancelar Pedido"
+                      >
+                        Cancelar
+                      </button>
+                    )}
                     <button
                       onClick={() => showToast(`Nota fiscal do pedido ${order.orderNumber} baixada em PDF!`)}
                       className="p-1.5 rounded-full border border-gray-200 text-gray-600 hover:text-black hover:bg-gray-50 transition"
