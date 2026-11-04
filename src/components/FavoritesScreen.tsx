@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { PRODUCTS } from '../data/products';
 import { 
   Heart, ShoppingBag, ArrowLeft, Trash2, Star, 
   Flame, Check, Plus, Tag, ArrowRight 
@@ -18,7 +17,7 @@ export const FavoritesScreen: React.FC = () => {
     showToast,
     products
   } = useCart();
-  const allProducts = products && products.length > 0 ? products : PRODUCTS;
+  const allProducts = products || [];
 
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'todos' | 'feminino' | 'infantil'>('todos');
   const [addedIds, setAddedIds] = useState<string[]>([]);

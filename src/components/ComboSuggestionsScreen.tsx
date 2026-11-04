@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { PRODUCTS } from '../data/products';
 import { 
   ArrowLeft, CheckCircle, Plus, Star, Heart, 
   ShoppingBag, ArrowRight, Check, Flame 
@@ -12,12 +11,12 @@ interface ComboSuggestionsScreenProps {
 }
 
 export const ComboSuggestionsScreen: React.FC<ComboSuggestionsScreenProps> = ({ onBack }) => {
-  const { cart, addToCart, setCurrentTab, closeSubScreen, openProductDetail, toggleFavorite, isFavorite } = useCart();
+  const { cart, addToCart, setCurrentTab, closeSubScreen, openProductDetail, toggleFavorite, isFavorite, products } = useCart();
   const [activeFilter, setActiveFilter] = useState('Todos no Combo');
   const [addedItems, setAddedItems] = useState<string[]>([]);
 
   // Eligible combo items
-  const comboProducts = PRODUCTS.filter(p => p.isComboEligible || p.price <= 60);
+  const comboProducts = (products || []).filter(p => p.isComboEligible || p.price <= 60);
 
   const filterChips = [
     'Todos no Combo',

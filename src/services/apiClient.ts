@@ -121,9 +121,7 @@ export function mapErpProductToStoreProduct(raw: any): StoreProduct {
       }
     });
   }
-  if (images.length === 0) {
-    images.push('https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
-  }
+  
 
   // Mapear variações
   const rawVariations: any[] = Array.isArray(raw.variations) ? raw.variations : [];

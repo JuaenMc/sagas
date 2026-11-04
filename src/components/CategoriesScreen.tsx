@@ -1,44 +1,68 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
-import { PRODUCTS } from '../data/products';
-import { Product } from '../types';
-import { 
-  ArrowLeft, ShoppingBag, Search, X, SlidersHorizontal, Check, 
-  Star, Heart, ArrowUpDown, ShieldCheck, RefreshCw, AlertCircle 
+import {
+  ArrowLeft,
+  ShoppingBag,
+  Search,
+  X,
+  SlidersHorizontal,
+  Check,
+  Star,
+  Heart,
+  RefreshCw,
+  AlertCircle,
+  PackageOpen,
 } from 'lucide-react';
 
 export const CategoriesScreen: React.FC = () => {
-  const { openProductDetail, toggleFavorite, isFavorite, setCurrentTab, cart, products, isLoadingProducts, productsError, fetchProductsFromERP } = useCart();
-  const allProducts = products && products.length > 0 ? products : PRODUCTS;
-  
-  const [searchTerm, setSearchTerm] = useState('Vestidos e conjuntos');
-  const [filterFreeShipping, setFilterFreeShipping] = useState(true);
-  const [filterMax50, setFilterMax50] = useState(true);
-  const [filterAgeRange, setFilterAgeRange] = useState(true);
-  const [sortBy, setSortBy] = useState<'mais_vendidos' | 'menor_preco' | 'maior_preco' | 'melhores_avaliados'>('mais_vendidos');
+  const {
+    openProductDetail,
+    toggleFavorite,
+    isFavorite,
+    setCurrentTab,
+    products,
+    isLoadingProducts,
+    productsError,
+    fetchProductsFromERP,
+  } = useCart();
+
+  useEffect(() => {
+    fetchProductsFromERP();
+  }, []);
+
+  const allProducts = products || [];
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterFreeShipping, setFilterFreeShipping] = useState(false);
+  const [filterMax50, setFilterMax50] = useState(false);
+  const [filterAgeRange, setFilterAgeRange] = useState(false);
+  const [sortBy, setSortBy] = useState<
+    'mais_vendidos' | 'menor_preco' | 'maior_preco' | 'melhores_avaliados'
+  >('mais_vendidos');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
-  const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+  const activeFiltersCount =
+    (filterFreeShipping ? 1 : 0) + (filterMax50 ? 1 : 0) + (filterAgeRange ? 1 : 0);
 
-  // Active filter count
-  const activeFiltersCount = (filterFreeShipping ? 1 : 0) + (filterMax50 ? 1 : 0) + (filterAgeRange ? 1 : 0);
-
-  // Filtered and sorted products
   const displayedProducts = useMemo(() => {
     let list = [...allProducts];
 
-    if (searchTerm.trim() && searchTerm !== 'Vestidos e conjuntos') {
+    if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q) || p.category.includes(q) || p.subCategory?.toLowerCase().includes(q));
+      list = list.filter(
+        (p) =>
+          (p.title || p.name || '').toLowerCase().includes(q) ||
+          (p.category || '').toLowerCase().includes(q) ||
+          p.subCategory?.toLowerCase().includes(q)
+      );
     }
 
     if (filterMax50) {
-      list = list.filter(p => p.price <= 50.00);
+      list = list.filter((p) => p.price <= 50.0);
     }
 
     if (filterFreeShipping) {
-      // Products with free shipping or over R$ 40
-      list = list.filter(p => p.secondaryBadge === 'Frete Grátis' || p.price >= 45.00);
+      list = list.filter((p) => p.secondaryBadge === 'Frete Grátis' || p.price >= 45.0);
     }
 
     if (sortBy === 'menor_preco') {
@@ -48,7 +72,6 @@ export const CategoriesScreen: React.FC = () => {
     } else if (sortBy === 'melhores_avaliados') {
       list.sort((a, b) => b.rating - a.rating);
     } else {
-      // mais vendidos
       list.sort((a, b) => (b.reviewsCount || 0) - (a.reviewsCount || 0));
     }
 
@@ -57,7 +80,7 @@ export const CategoriesScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full pb-12 text-[#171b2b] relative">
-      {/* Category In-page Title & Breadcrumb */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-2 border-b border-[#EAE6DF]">
         <div className="flex items-center gap-3">
           <button
@@ -69,11 +92,21 @@ export const CategoriesScreen: React.FC = () => {
           </button>
           <div>
             <h1 className="font-black text-lg sm:text-2xl text-[#171b2b]">Catálogo SAGAS Brasil</h1>
-            <span className="text-xs text-gray-500 font-medium">Coleção Verão • {displayedProducts.length} peças encontradas</span>
+            <span className="text-xs text-gray-500 font-medium">
+              {displayedProducts.length}{' '}
+              {displayedProducts.length === 1 ? 'peça encontrada' : 'peças encontradas'}
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchProductsFromERP()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:border-[#FF6B57] transition shadow-2xs"
+          >
+            <RefreshCw size={14} className={isLoadingProducts ? 'animate-spin text-[#FF6B57]' : ''} />
+            <span>Atualizar</span>
+          </button>
           <button
             onClick={() => setIsFilterModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:border-[#FF6B57] transition shadow-2xs"
@@ -89,15 +122,15 @@ export const CategoriesScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Search Bar with clear button */}
-      <div className="px-4 pt-3 pb-2 bg-white">
+      {/* Search Bar */}
+      <div className="px-4 pt-3 pb-2 bg-white rounded-t-2xl">
         <div className="relative flex items-center w-full">
           <Search size={18} className="absolute left-3.5 text-gray-400 pointer-events-none" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Vestidos e conjuntos"
+            placeholder="Buscar produtos no catálogo..."
             className="w-full h-11 pl-10 pr-10 rounded-full bg-[#f3f2ff]/60 border border-[#dee1f8] text-sm text-[#171b2b] focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#ff6b57]/20"
           />
           {searchTerm && (
@@ -111,9 +144,8 @@ export const CategoriesScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Chips Horizontal Strip matching Image 3 */}
-      <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar bg-white border-b border-[#EAE6DF]">
-        {/* Filtrar Button with badge */}
+      {/* Filter Chips */}
+      <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar bg-white border-b border-[#EAE6DF] rounded-b-2xl">
         <button
           onClick={() => setIsFilterModalOpen(true)}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-xs shrink-0 active:scale-95 transition-all"
@@ -127,7 +159,6 @@ export const CategoriesScreen: React.FC = () => {
           )}
         </button>
 
-        {/* Frete Grátis chip */}
         <button
           onClick={() => setFilterFreeShipping(!filterFreeShipping)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all ${
@@ -140,7 +171,6 @@ export const CategoriesScreen: React.FC = () => {
           <span>Frete Grátis</span>
         </button>
 
-        {/* Até R$ 50 chip */}
         {filterMax50 && (
           <button
             onClick={() => setFilterMax50(false)}
@@ -150,29 +180,18 @@ export const CategoriesScreen: React.FC = () => {
             <X size={13} className="text-gray-500" />
           </button>
         )}
-
-        {/* 3-7 anos chip */}
-        {filterAgeRange && (
-          <button
-            onClick={() => setFilterAgeRange(false)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-gray-300 text-xs font-semibold text-gray-800 shrink-0 shadow-xs hover:bg-gray-50"
-          >
-            <span>3-7 anos</span>
-            <X size={13} className="text-gray-500" />
-          </button>
-        )}
       </div>
 
-      {/* Banner de Erro/Offline se houver */}
+      {/* Banner de Erro se houver */}
       {productsError && (
-        <div className="mx-4 my-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs text-amber-800">
+        <div className="my-3 p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-between text-xs text-red-800">
           <div className="flex items-center gap-2">
-            <AlertCircle size={16} className="text-amber-600 shrink-0" />
+            <AlertCircle size={16} className="text-red-600 shrink-0" />
             <span>{productsError}</span>
           </div>
           <button
             onClick={() => fetchProductsFromERP()}
-            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
+            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 transition"
           >
             <RefreshCw size={11} />
             <span>Reconectar</span>
@@ -180,7 +199,7 @@ export const CategoriesScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Results Header: Count & Sorting */}
+      {/* Results Header */}
       <div className="px-4 py-3 flex items-center justify-between text-xs text-gray-600">
         <span className="font-semibold">
           <strong className="text-[#171b2b]">{displayedProducts.length}</strong> produtos encontrados
@@ -201,11 +220,14 @@ export const CategoriesScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Responsive Product Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 px-0 sm:px-2 w-full">
-        {isLoadingProducts ? (
-          [...Array(6)].map((_, i) => (
-            <div key={i} className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse">
+      {/* Loading Skeletons, EmptyState ou Grid de Produtos Reais */}
+      {isLoadingProducts ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 px-0 sm:px-2 w-full">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] animate-pulse"
+            >
               <div className="w-full aspect-[3/4] bg-stone-200"></div>
               <div className="p-3 flex flex-col gap-2">
                 <div className="h-3 w-16 bg-stone-200 rounded"></div>
@@ -213,11 +235,35 @@ export const CategoriesScreen: React.FC = () => {
                 <div className="h-5 w-20 bg-stone-200 rounded mt-1"></div>
               </div>
             </div>
-          ))
-        ) : (
-          displayedProducts.map(product => {
+          ))}
+        </div>
+      ) : displayedProducts.length === 0 ? (
+        <div className="mt-4 py-14 px-6 bg-white rounded-3xl border border-[#EAE6DF] shadow-xs flex flex-col items-center justify-center text-center max-w-xl mx-auto w-full">
+          <div className="w-14 h-14 rounded-2xl bg-[#FFF0ED] text-[#FF6B57] flex items-center justify-center mb-3">
+            <PackageOpen size={28} />
+          </div>
+          <h3 className="text-base sm:text-lg font-black text-[#171b2b]">
+            Nenhum produto cadastrado
+          </h3>
+          <p className="text-xs text-gray-500 max-w-sm mt-1 leading-relaxed">
+            O catálogo está vazio no momento. Assim que novos produtos forem cadastrados no ERP
+            SAGAS, eles aparecerão automaticamente aqui.
+          </p>
+          <button
+            onClick={() => fetchProductsFromERP()}
+            className="mt-4 px-5 py-2.5 rounded-full bg-[#171b2b] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+          >
+            <RefreshCw size={13} />
+            <span>Recarregar da API</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 px-0 sm:px-2 w-full">
+          {displayedProducts.map((product) => {
             const favorited = isFavorite(product.id);
-            const displayImg = product.coverImageUrl || (product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=900&q=80');
+            const displayImg =
+              product.coverImageUrl ||
+              (product.images && product.images.length > 0 ? product.images[0] : '');
             const displayName = product.title || product.name;
             const isOutOfStock = (product.stock ?? 1) <= 0;
 
@@ -227,15 +273,17 @@ export const CategoriesScreen: React.FC = () => {
                 onClick={() => openProductDetail(product)}
                 className="cursor-pointer flex flex-col bg-white rounded-2xl overflow-hidden shadow-xs border border-[#EAE6DF] hover:shadow-md transition-all relative group"
               >
-                {/* Photo Box */}
-                <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
-                  <img
-                    src={displayImg}
-                    alt={displayName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+                <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden flex items-center justify-center">
+                  {displayImg ? (
+                    <img
+                      src={displayImg}
+                      alt={displayName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <ShoppingBag size={32} className="text-gray-300" />
+                  )}
 
-                  {/* Badges on Top Left */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
                     {isOutOfStock ? (
                       <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-extrabold shadow-xs">
@@ -253,7 +301,6 @@ export const CategoriesScreen: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Floating Heart on Top Right */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -268,7 +315,6 @@ export const CategoriesScreen: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Product Info */}
                 <div className="p-3 flex flex-col flex-1 justify-between gap-1.5">
                   <div>
                     <h3 className="text-xs font-semibold text-[#171b2b] line-clamp-1 leading-snug">
@@ -277,7 +323,6 @@ export const CategoriesScreen: React.FC = () => {
                     <div className="flex items-center gap-1 mt-1 text-[11px] text-gray-500">
                       <Star size={13} className="text-amber-500 fill-amber-500" />
                       <span className="font-bold text-[#171b2b]">{product.rating}</span>
-                      <span>({product.reviewsCount})</span>
                     </div>
                   </div>
 
@@ -292,43 +337,17 @@ export const CategoriesScreen: React.FC = () => {
                     </span>
                     {product.variations && product.variations.length > 0 && (
                       <span className="text-[10px] text-gray-400 mt-0.5">
-                        {product.variations.length} {product.variations.length === 1 ? 'variação' : 'variações'}
+                        {product.variations.length}{' '}
+                        {product.variations.length === 1 ? 'variação' : 'variações'}
                       </span>
                     )}
                   </div>
                 </div>
               </article>
             );
-          })
-        )}
-      </div>
-
-      {/* Bottom Guarantee Banner matching Image 3 */}
-      <div className="px-4 mt-6">
-        <div className="p-3.5 bg-[#dee1f8]/40 border border-[#dee1f8] rounded-2xl flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-[#3d6751] shrink-0 shadow-xs">
-            <RefreshCw size={18} />
-          </div>
-          <div>
-            <h4 className="text-xs font-extrabold text-[#171b2b]">Primeira troca grátis em até 30 dias</h4>
-            <p className="text-[11px] text-gray-600 mt-0.5">Compre com segurança para os pequenos.</p>
-          </div>
+          })}
         </div>
-      </div>
-
-      {/* Floating Bottom Filter Pill matching Image 3 */}
-      <button
-        onClick={() => setIsFilterModalOpen(true)}
-        className="fixed bottom-20 right-4 z-40 bg-[#ff6b57] hover:bg-[#ff5745] text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 font-bold text-xs active:scale-95 transition-transform"
-      >
-        <SlidersHorizontal size={16} />
-        <span>Filtros</span>
-        {activeFiltersCount > 0 && (
-          <span className="w-5 h-5 rounded-full bg-white text-[#ff6b57] text-[10px] font-black flex items-center justify-center">
-            {activeFiltersCount}
-          </span>
-        )}
-      </button>
+      )}
 
       {/* Filter Modal Drawer */}
       {isFilterModalOpen && (
@@ -351,7 +370,9 @@ export const CategoriesScreen: React.FC = () => {
                   <button
                     onClick={() => setFilterMax50(!filterMax50)}
                     className={`px-3 py-1.5 rounded-full border font-bold ${
-                      filterMax50 ? 'bg-[#ff6b57] text-white border-[#ff6b57]' : 'bg-gray-50 text-gray-700'
+                      filterMax50
+                        ? 'bg-[#ff6b57] text-white border-[#ff6b57]'
+                        : 'bg-gray-50 text-gray-700'
                     }`}
                   >
                     Até R$ 50,00
@@ -359,7 +380,9 @@ export const CategoriesScreen: React.FC = () => {
                   <button
                     onClick={() => setFilterMax50(false)}
                     className={`px-3 py-1.5 rounded-full border font-bold ${
-                      !filterMax50 ? 'bg-[#ff6b57] text-white border-[#ff6b57]' : 'bg-gray-50 text-gray-700'
+                      !filterMax50
+                        ? 'bg-[#ff6b57] text-white border-[#ff6b57]'
+                        : 'bg-gray-50 text-gray-700'
                     }`}
                   >
                     Qualquer valor
@@ -372,23 +395,14 @@ export const CategoriesScreen: React.FC = () => {
                 <button
                   onClick={() => setFilterFreeShipping(!filterFreeShipping)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-bold ${
-                    filterFreeShipping ? 'bg-[#bfedd1] text-[#254f3a] border-emerald-400' : 'bg-gray-50 text-gray-700'
+                    filterFreeShipping
+                      ? 'bg-[#bfedd1] text-[#254f3a] border-emerald-400'
+                      : 'bg-gray-50 text-gray-700'
                   }`}
                 >
                   <Check size={14} />
                   <span>Apenas Frete Grátis</span>
                 </button>
-              </div>
-
-              <div>
-                <label className="font-bold text-gray-800 block mb-1">Tamanhos Disponíveis</label>
-                <div className="flex gap-2">
-                  {['P', 'M', 'G', 'GG'].map(size => (
-                    <span key={size} className="w-8 h-8 rounded-lg bg-gray-100 font-bold flex items-center justify-center text-gray-700 border">
-                      {size}
-                    </span>
-                  ))}
-                </div>
               </div>
             </div>
 

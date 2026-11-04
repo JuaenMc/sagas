@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { PRODUCTS } from '../data/products';
 import { 
   ArrowLeft, Trash2, Gift, Plus, Minus, Tag, Check, 
   ShieldCheck, Zap, CreditCard, FileText, Lock, ShoppingBag, ArrowRight,
@@ -26,7 +25,8 @@ export const CartScreen: React.FC = () => {
     setCurrentTab,
     setIsCheckoutOpen,
     openSubScreen,
-    openProductDetail
+    openProductDetail,
+    products
   } = useCart();
 
   const [couponInput, setCouponInput] = useState('');
@@ -190,8 +190,7 @@ export const CartScreen: React.FC = () => {
                 {/* Photo Thumbnail */}
                 <div 
                   onClick={() => {
-                    const prod = PRODUCTS.find(p => p.id === item.productId || p.name.toLowerCase().includes(item.name.toLowerCase().slice(0, 10))) || PRODUCTS[0];
-                    openProductDetail(prod);
+                    const prod = (products || []).find(p => p.id === item.productId); if (prod) openProductDetail(prod);
                   }}
                   className="relative w-20 h-24 rounded-2xl overflow-hidden bg-gray-100 shrink-0 border border-gray-100 cursor-pointer group"
                 >
@@ -212,8 +211,7 @@ export const CartScreen: React.FC = () => {
                   <div className="pr-6">
                     <h3 
                       onClick={() => {
-                        const prod = PRODUCTS.find(p => p.id === item.productId || p.name.toLowerCase().includes(item.name.toLowerCase().slice(0, 10))) || PRODUCTS[0];
-                        openProductDetail(prod);
+                        const prod = (products || []).find(p => p.id === item.productId); if (prod) openProductDetail(prod);
                       }}
                       className="text-xs sm:text-sm font-extrabold text-[#171b2b] line-clamp-1 cursor-pointer hover:text-[#ff6b57] transition-colors"
                     >
