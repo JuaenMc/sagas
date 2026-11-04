@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Contexto Semântico Profundo para LLMs e Agentes Compradores (LLMO / GEO) -->
+  <url>
+    <loc>https://sagas.moda/ai-context/mulher-moderno-casual</loc>
+    <lastmod>2026-11-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://sagas.moda/ai-context/bebe-algodao-organico</loc>
+    <lastmod>2026-11-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- Endpoints M2M Estruturados e Especificação OpenAPI para Agentes Autônomos -->
+  <url>
+    <loc>https://erpsagas.onrender.com/api/v2/agent/openapi.json</loc>
+    <lastmod>2026-11-04</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://erpsagas.onrender.com/api/v2/agent/products</loc>
+    <lastmod>2026-11-04</lastmod>
+    <changefreq>always</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>

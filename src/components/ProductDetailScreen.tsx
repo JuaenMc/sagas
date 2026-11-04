@@ -23,6 +23,12 @@ import {
 import { VirtualFittingModal } from './VirtualFittingModal';
 import { SizeGuideModal } from './SizeGuideModal';
 import { getProductById } from '../services/apiClient';
+import {
+  generateProductJsonLd,
+  injectJsonLdScript,
+  updateLlmoMetaTags,
+  inferProductSemanticAttributes,
+} from '../lib/seo-schema-generator';
 
 interface ProductDetailScreenProps {
   product: Product;
@@ -103,6 +109,26 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ produc
 
   const activePrice = activeVariation?.price ?? detailedProduct.price ?? 0;
   const activeStock = activeVariation?.stock ?? detailedProduct.stock ?? 0;
+  const semanticAttrs = React.useMemo(
+    () => inferProductSemanticAttributes(detailedProduct),
+    [detailedProduct]
+  );
+
+  // LLMO & Schema.org JSON-LD dinâmico para indexação por IAs (GPTBot, Perplexity, Google Shopping Graph)
+  React.useEffect(() => {
+    const productSchema = generateProductJsonLd(detailedProduct);
+    injectJsonLdScript('sagas-dynamic-product-jsonld', productSchema);
+    updateLlmoMetaTags({
+      title: `${detailedProduct.name} | R$ ${activePrice.toFixed(2)} — SAGAS.MODA (${detailedProduct.category})`,
+      description: `Compre ${detailedProduct.name} na SAGAS.MODA por R$ ${activePrice.toFixed(
+        2
+      )} (ou R$ ${(activePrice * 0.9).toFixed(2)} no PIX). Tecido: ${
+        semanticAttrs.material
+      }. Caimento: ${semanticAttrs.fit}. Ocasião: ${semanticAttrs.occasion.join(
+        ', '
+      )}. Estoque em tempo real: ${activeStock} un. Troca grátis em 30 dias.`,
+    });
+  }, [detailedProduct, activePrice, activeStock, semanticAttrs]);
   const activeSku = activeVariation?.sku || detailedProduct.masterSku || detailedProduct.id;
   const activeVarId = activeVariation?.id;
   const isOutOfStock = activeStock <= 0;

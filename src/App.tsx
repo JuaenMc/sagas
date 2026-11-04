@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CartProvider, useCart } from './context/CartContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -18,16 +18,47 @@ import { AddressesScreen } from './components/AddressesScreen';
 import { AdminCatalogScreen } from './components/AdminCatalogScreen';
 import { TechStackGuideModal } from './components/TechStackGuideModal';
 import { CheckoutModal } from './components/CheckoutModal';
+import { AIShoppingAssistant } from './components/AIShoppingAssistant';
+import { AIContextPage } from './components/AIContextPage';
+import { generateStoreAndFaqJsonLd, injectJsonLdScript } from './lib/seo-schema-generator';
 
 const MainAppContent: React.FC = () => {
-  const { 
-    currentTab, 
+  const {
+    currentTab,
     subScreen,
     closeSubScreen,
-    selectedProduct, 
-    closeProductDetail, 
-    toastMessage
+    selectedProduct,
+    closeProductDetail,
+    toastMessage,
   } = useCart();
+
+  const [aiContextSlug, setAiContextSlug] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const path = window.location.pathname;
+    if (path.startsWith('/ai-context/')) {
+      return path.replace('/ai-context/', '').replace(/\/+$/, '');
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ai_context');
+  });
+
+  useEffect(() => {
+    injectJsonLdScript('sagas-global-store-faq-jsonld', generateStoreAndFaqJsonLd());
+  }, []);
+
+  if (aiContextSlug) {
+    return (
+      <AIContextPage
+        slug={aiContextSlug}
+        onExitToStore={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/');
+          }
+          setAiContextSlug(null);
+        }}
+      />
+    );
+  }
 
   const renderActiveScreen = () => {
     // 1. Full Screen Sub-routes
@@ -97,7 +128,7 @@ const MainAppContent: React.FC = () => {
       {/* Clean Unified Responsive Header */}
       <Header />
 
-      {/* Main Store Viewport (Fully Responsive without mobile phone shells) */}
+      {/* Main Store Viewport */}
       <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-3 sm:py-6">
         {renderActiveScreen()}
       </main>
@@ -105,12 +136,15 @@ const MainAppContent: React.FC = () => {
       {/* Clean E-Commerce Desktop Footer */}
       <Footer />
 
-      {/* Mobile-Only Bottom Navigation (Thumb friendly on mobile, hidden on desktop) */}
+      {/* Mobile-Only Bottom Navigation */}
       {showBottomNav && (
         <div className="md:hidden">
           <BottomNavigation />
         </div>
       )}
+
+      {/* Assistente de Compras Inteligente (RAG Conversacional -> Ação Real na Sacola) */}
+      <AIShoppingAssistant />
 
       {/* Global Interactive Modals */}
       <TechStackGuideModal />

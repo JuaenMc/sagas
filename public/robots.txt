@@ -1,0 +1,52 @@
+# ============================================================================
+# SAGAS.MODA — AI-NATIVE & AGENTIC COMMERCE ROBOTS.TXT (LLMO / GEO READY)
+# ============================================================================
+
+User-agent: GPTBot
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: OAI-SearchBot
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: Google-Extended
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: Googlebot
+Allow: /
+Allow: /ai-context/
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: anthropic-ai
+Allow: /
+Allow: /ai-context/
+Allow: /api/v2/agent/
+
+User-agent: *
+Allow: /
+Allow: /ai-context/mulher-moderno-casual
+Allow: /ai-context/bebe-algodao-organico
+
+# Sitemaps separados: Dados Estruturados M2M/LLMO vs Navegação Visual Humana
+Sitemap: https://sagas.moda/sitemap.xml
+Sitemap: https://sagas.moda/sitemap-structured.xml
+Sitemap: https://sagas.moda/sitemap-visual.xml
