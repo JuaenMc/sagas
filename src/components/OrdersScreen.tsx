@@ -104,7 +104,7 @@ const INITIAL_DEMO_ORDERS: Order[] = [
 
 export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onBack }) => {
   const { closeSubScreen, currentUser, firebaseAuthUser, showToast, setCurrentTab, storeSettings } = useCart();
-  const [orders, setOrders] = useState<Order[]>(INITIAL_DEMO_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'todos' | 'em_andamento' | 'entregues'>('todos');
   const [searchQuery, setSearchQuery] = useState('');

@@ -246,7 +246,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
   // Dynamic Products Catalog (ERP Sincronizado + Fallback Local)
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [isSyncedWithErp, setIsSyncedWithErp] = useState<boolean>(false);
@@ -410,18 +410,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProductsError(null);
     try {
       const erpProducts = await erpClient.getProducts();
-      if (erpProducts && erpProducts.length > 0) {
+      if (Array.isArray(erpProducts)) {
         setProducts(erpProducts);
         setIsSyncedWithErp(true);
-        console.info(`[CartContext] Catálogo sincronizado com o ERP (${erpProducts.length} produtos carregados).`);
+        console.info('[CartContext] Catálogo sincronizado com o ERP:', erpProducts.length);
       } else {
-        console.warn('[CartContext] ERP retornou lista vazia ou falhou. Mantendo catálogo estático como fallback.');
-        setProducts(PRODUCTS);
+        setProducts([]);
         setIsSyncedWithErp(false);
       }
     } catch (err: any) {
       console.warn('[CartContext] Falha ao consultar ERP, usando fallback local:', err?.message);
-      setProducts(PRODUCTS);
+      setProducts([]);
       setProductsError('Servidor ERP temporariamente indisponível. Exibindo catálogo em cache.');
       setIsSyncedWithErp(false);
     } finally {

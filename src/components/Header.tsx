@@ -54,36 +54,8 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      {/* Top Announcement Strip */}
-      <div className="w-full bg-[#171B2B] text-white text-[11px] font-medium py-1.5 px-4 flex items-center justify-between">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B57] animate-pulse"></span>
-            <span className="hidden sm:inline text-gray-300">Frete Grátis acima de R$ 149</span>
-            <span className="sm:hidden text-gray-300">Frete Grátis &gt; R$ 149</span>
-            <span className="text-gray-400">•</span>
-            <span className="text-amber-300 font-bold">Combo 3 por R$ 100</span>
-          </div>
-
-          <div className="flex items-center gap-4 text-gray-300">
-            <span className="hidden md:inline">Parcele em até 6x s/ juros</span>
-            {firebaseAuthUser ? (
-              <span className="text-emerald-300 font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                {currentUser?.displayName?.split(' ')[0] || 'Cliente'}
-              </span>
-            ) : (
-              <button 
-                onClick={() => openSubScreen('login')}
-                className="hover:text-white transition flex items-center gap-1"
-              >
-                <LogIn size={11} />
-                <span>Entrar</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+    
+      
 
       {/* Main Responsive Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#EAE6DF] shadow-xs">
